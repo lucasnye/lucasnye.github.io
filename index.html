@@ -1,16 +1,321 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>My Portfolio</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Becoming Friends With My Camera — CS180 Proj0</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue: #003262;
+    --blue-deep: #001c3d;
+    --gold: #FDB515;
+    --rock: #3B7EA1;
+    --paper: #F4F3EE;
+  }
+  html{scroll-behavior:smooth;}
+  body{
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(rgba(0,50,98,0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,50,98,0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+    font-family: 'Inter', sans-serif;
+    color: var(--blue-deep);
+  }
+  .font-serif-display{ font-family: 'Source Serif 4', serif; }
+  .font-mono{ font-family: 'IBM Plex Mono', monospace; }
+
+  /* viewfinder corner brackets around photos */
+  .viewfinder{
+    position: relative;
+    padding: 14px;
+  }
+  .viewfinder::before, .viewfinder::after,
+  .viewfinder .vf-br, .viewfinder .vf-bl{
+    content:"";
+    position:absolute;
+    width: 22px; height: 22px;
+    border: 2.5px solid var(--gold);
+  }
+  .viewfinder::before{ top:0; left:0; border-right:none; border-bottom:none; }
+  .viewfinder::after{ top:0; right:0; border-left:none; border-bottom:none; }
+  .viewfinder .vf-bl{ bottom:0; left:0; border-right:none; border-top:none; }
+  .viewfinder .vf-br{ bottom:0; right:0; border-left:none; border-top:none; }
+
+  .readout{
+    position:absolute;
+    bottom: 24px; left: 24px;
+    background: var(--blue-deep);
+    color: var(--gold);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    padding: 4px 9px;
+  }
+
+  .filmframe img{
+    aspect-ratio: 3/4;
+    object-fit: cover;
+  }
+
+  /* comparison slider */
+  .compare{
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 3/4;
+  }
+  .compare img{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit: cover;
+    user-select:none; pointer-events:none;
+  }
+  .compare .after-layer{
+    clip-path: inset(0 0 0 50%);
+  }
+  .compare-handle{
+    position:absolute;
+    top:0; bottom:0;
+    left:50%;
+    width: 3px;
+    background: var(--gold);
+    transform: translateX(-1.5px);
+    pointer-events:none;
+  }
+  .compare-handle::after{
+    content:"⟷";
+    position:absolute;
+    top:50%; left:50%;
+    transform: translate(-50%,-50%);
+    width:38px; height:38px;
+    background: var(--gold);
+    color: var(--blue-deep);
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  }
+
+  .sprocket-row{
+    background-image: radial-gradient(circle, var(--blue-deep) 3px, transparent 3px);
+    background-size: 26px 100%;
+    background-position: 10px center;
+    height: 14px;
+  }
+
+  @keyframes riseIn{
+    from{ opacity:0; transform: translateY(14px); }
+    to{ opacity:1; transform: translateY(0); }
+  }
+  .rise-in{ animation: riseIn 0.7s cubic-bezier(.22,.61,.36,1) both; }
+
+  .section-tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--rock);
+  }
+</style>
 </head>
-<body>
-    <h1>Welcome to My CS180 Portfolio!</h1>
-    <a href="./1/index.html">Project 1</a>
+<body class="antialiased">
+
+<!-- NAV -->
+<header class="sticky top-0 z-40 backdrop-blur bg-[#F4F3EE]/90 border-b border-[var(--blue)]/15">
+  <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-baseline gap-2">
+      <span class="font-serif-display text-lg font-semibold text-[var(--blue)]">Proj0</span>
+      <span class="section-tag hidden sm:inline">CS180 · Computational Photography</span>
+    </div>
+    <nav class="flex gap-5 text-sm font-medium text-[var(--blue)]">
+      <a href="#part1" class="hover:text-[var(--gold)] transition-colors">Selfie</a>
+      <a href="#part2" class="hover:text-[var(--gold)] transition-colors">Facade</a>
+      <a href="#part3" class="hover:text-[var(--gold)] transition-colors">Dolly&nbsp;Zoom</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="max-w-5xl mx-auto px-6 pt-16 pb-10">
+  <p class="section-tag rise-in">CS180 — Intro to Computer Vision &amp; Computational Photography</p>
+  <h1 class="font-serif-display text-4xl sm:text-6xl font-semibold text-[var(--blue)] mt-3 leading-[1.05] rise-in" style="animation-delay:.05s">
+    Becoming Friends<br class="hidden sm:block"> With My Camera
+  </h1>
+  <p class="mt-5 max-w-xl text-[15px] leading-relaxed text-[var(--blue-deep)]/80 rise-in" style="animation-delay:.1s">
+    Four photos, one face, no movement — just distance and zoom trading places.
+    A short study of how focal length and camera position quietly decide what a photograph looks like.
+  </p>
+
+  <!-- filmstrip hero -->
+  <div class="mt-10 rise-in" style="animation-delay:.18s">
+    <div class="sprocket-row rounded-t-sm"></div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[var(--blue)]/20 border-x border-[var(--blue)]/20">
+      <div class="filmframe relative bg-black">
+        <img src="images/IMG_8999.jpg" alt="Selfie at 24mm, close to the camera" class="w-full h-full">
+        <span class="readout font-mono">24mm</span>
+      </div>
+      <div class="filmframe relative bg-black">
+        <img src="images/IMG_9001.jpg" alt="Selfie at 52mm, stepping back" class="w-full h-full">
+        <span class="readout font-mono">52mm</span>
+      </div>
+      <div class="filmframe relative bg-black">
+        <img src="images/IMG_9002.jpg" alt="Selfie at 79mm, further back" class="w-full h-full">
+        <span class="readout font-mono">79mm</span>
+      </div>
+      <div class="filmframe relative bg-black">
+        <img src="images/IMG_9003.jpg" alt="Selfie at 112mm, farthest back" class="w-full h-full">
+        <span class="readout font-mono">112mm</span>
+      </div>
+    </div>
+    <div class="sprocket-row rounded-b-sm"></div>
+  </div>
+</section>
+
+<!-- INTRO STRIP -->
+<section class="max-w-5xl mx-auto px-6 py-10 border-t border-[var(--blue)]/15">
+  <div class="grid sm:grid-cols-3 gap-8 text-sm leading-relaxed text-[var(--blue-deep)]/85">
+    <p><span class="font-serif-display text-[var(--blue)] font-semibold">The idea.</span>
+      Every lens has a center of projection. Move the camera, and you move that center —
+      which reshapes a face or a building even when nothing else in the frame changes.</p>
+    <p><span class="font-serif-display text-[var(--blue)] font-semibold">The method.</span>
+      Three small experiments below, each swapping distance for zoom (or the reverse),
+      done with an iPhone 16 Pro Max and its own EXIF data as the record.</p>
+    <p><span class="font-serif-display text-[var(--blue)] font-semibold">The takeaway.</span>
+      Perspective is a function of where the camera stands, not of the lens alone.
+      Zoom just crops — position does the distorting.</p>
+  </div>
+</section>
+
+<!-- PART 1 -->
+<section id="part1" class="max-w-5xl mx-auto px-6 py-16 border-t border-[var(--blue)]/15">
+  <p class="section-tag">Part 1</p>
+  <h2 class="font-serif-display text-3xl sm:text-4xl font-semibold text-[var(--blue)] mt-2">
+    The selfie, done wrong and then right
+  </h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-[var(--blue-deep)]/85">
+    First shot: phone at arm's length, wide lens, 24mm equivalent. Second shot: several feet back,
+    zoomed to 112mm, cropped so the face reads at roughly the same size. Same face,
+    same room, same afternoon — very different geometry.
+  </p>
+
+  <div class="mt-10 grid sm:grid-cols-2 gap-8">
+    <div>
+      <div class="compare viewfinder" id="compare1">
+        <span class="vf-bl"></span><span class="vf-br"></span>
+        <img src="images/IMG_8999.jpg" alt="Close, wide-angle selfie" class="before-layer">
+        <img src="images/IMG_9003.jpg" alt="Distant, zoomed-in selfie" class="after-layer">
+        <div class="compare-handle"></div>
+        <span class="readout font-mono">24mm → 112mm</span>
+      </div>
+      <input type="range" min="0" max="100" value="50" class="w-full mt-3 accent-[var(--gold)]" data-compare="compare1" aria-label="Drag to compare close-up and distant selfie">
+    </div>
+    <div class="flex flex-col justify-center gap-4 text-[15px] leading-relaxed text-[var(--blue-deep)]/85">
+      <div class="border-l-2 border-[var(--gold)] pl-4">
+        <p class="font-mono text-xs text-[var(--rock)] mb-1">24mm · arm's length</p>
+        <p>Up close, the wide lens has to cover a lot of face in a short distance, so it stretches
+          whatever is nearest — usually the nose — and pushes the ears back and out of frame.
+          It's the same reason a fisheye lens bulges the middle of a photo.</p>
+      </div>
+      <div class="border-l-2 border-[var(--blue)] pl-4">
+        <p class="font-mono text-xs text-[var(--rock)] mb-1">112mm · six feet back</p>
+        <p>From farther away, every part of the face is close to the same distance from the lens,
+          so the proportions flatten out and look the way they do in a mirror.
+          Zooming in just crops that flatter geometry down to a familiar frame.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PART 2 -->
+<section id="part2" class="max-w-5xl mx-auto px-6 py-16 border-t border-[var(--blue)]/15">
+  <p class="section-tag">Part 2</p>
+  <h2 class="font-serif-display text-3xl sm:text-4xl font-semibold text-[var(--blue)] mt-2">
+    Sproul Hall, compressed and then not
+  </h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-[var(--blue-deep)]/85">
+    Same trick, run backward, on a building instead of a face. Standing back near the plaza's edge and
+    zooming to 37mm flattens Sproul Hall's columns into a stack of parallel lines. Walking in close and
+    shooting wide at 24mm lets the facade recover its actual depth.
+  </p>
+
+  <div class="mt-10 grid sm:grid-cols-2 gap-8">
+    <div class="flex flex-col justify-center gap-4 text-[15px] leading-relaxed text-[var(--blue-deep)]/85 order-2 sm:order-1">
+      <div class="border-l-2 border-[var(--blue)] pl-4">
+        <p class="font-mono text-xs text-[var(--rock)] mb-1">37mm · from the plaza</p>
+        <p>Far from the building, the columns are all nearly the same distance from the camera, so the
+          lens renders them at nearly the same size — the facade reads as flat as a photograph
+          of a photograph.</p>
+      </div>
+      <div class="border-l-2 border-[var(--gold)] pl-4">
+        <p class="font-mono text-xs text-[var(--rock)] mb-1">24mm · at the steps</p>
+        <p>Standing at the base, the nearest column is genuinely much closer than the far one, so
+          the wide lens exaggerates that gap — the pediment leans back, the columns fan out,
+          and the building feels three-dimensional again.</p>
+      </div>
+    </div>
+    <div class="order-1 sm:order-2">
+      <div class="compare viewfinder" id="compare2">
+        <span class="vf-bl"></span><span class="vf-br"></span>
+        <img src="images/IMG_9019.jpg" alt="Sproul Hall photographed from far away, zoomed in, appearing flattened" class="before-layer">
+        <img src="images/IMG_9018.jpg" alt="Sproul Hall photographed up close with a wide lens, appearing three-dimensional" class="after-layer">
+        <div class="compare-handle"></div>
+        <span class="readout font-mono">37mm → 24mm</span>
+      </div>
+      <input type="range" min="0" max="100" value="50" class="w-full mt-3 accent-[var(--gold)]" data-compare="compare2" aria-label="Drag to compare compressed and expanded views of Sproul Hall">
+    </div>
+  </div>
+</section>
+
+<!-- PART 3 -->
+<section id="part3" class="max-w-5xl mx-auto px-6 py-16 border-t border-[var(--blue)]/15">
+  <p class="section-tag">Part 3</p>
+  <h2 class="font-serif-display text-3xl sm:text-4xl font-semibold text-[var(--blue)] mt-2">
+    The dolly zoom
+  </h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-[var(--blue-deep)]/85">
+    Hitchcock's trick from <span class="italic">Vertigo</span>: walk the camera backward while zooming in,
+    keeping the subject the same size in frame while everything behind it rushes into the distance.
+    Stand-in subject here is a small desk bear, six frames, tripod-free.
+  </p>
+
+  <div class="mt-10 flex justify-center">
+    <div class="viewfinder max-w-xs w-full">
+      <span class="vf-bl"></span><span class="vf-br"></span>
+      <img src="images/dolly_zoom.gif" alt="Animated dolly zoom of a small bear figurine, background warping as the camera pulls back and zooms in" class="w-full block">
+      <span class="readout font-mono">6 frames</span>
+    </div>
+  </div>
+
+  <p class="mt-6 max-w-2xl mx-auto text-center text-[15px] leading-relaxed text-[var(--blue-deep)]/85">
+    The bear stays locked to the same size across all six frames, but the shelf behind it visibly
+    stretches — walls seem to bow outward as the field of view narrows.
+    That mismatch between a fixed subject and a shifting background is the whole effect.
+  </p>
+</section>
+
+<!-- FOOTER -->
+<footer class="max-w-5xl mx-auto px-6 py-10 border-t border-[var(--blue)]/15">
+  <div class="flex flex-col sm:flex-row justify-between gap-3 text-xs text-[var(--blue-deep)]/60">
+    <p>CS180 — Intro to Computer Vision and Computational Photography · Programming Project 0</p>
+    <p class="font-mono">iPhone 16 Pro Max · Berkeley, CA</p>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('input[data-compare]').forEach(function(slider){
+    var box = document.getElementById(slider.dataset.compare);
+    var after = box.querySelector('.after-layer');
+    var handle = box.querySelector('.compare-handle');
+    function update(){
+      var v = slider.value;
+      after.style.clipPath = 'inset(0 0 0 ' + v + '%)';
+      handle.style.left = v + '%';
+    }
+    slider.addEventListener('input', update);
+    update();
+  });
+</script>
+
 </body>
 </html>
