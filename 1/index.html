@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colorizing the Prokudin-Gorskii Collection — CS 180 Project 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          berkeley: '#003262',
+          gold: '#FDB515',
+          founders: '#3B7EA1',
+          paper: '#FAF6EC',
+          ink: '#1B1B18',
+        },
+        fontFamily: {
+          serif: ['"Source Serif 4"', 'serif'],
+          sans: ['Inter', 'sans-serif'],
+          mono: ['"IBM Plex Mono"', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body {
+    background-color: #FAF6EC;
+    background-image:
+      linear-gradient(rgba(0,50,98,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,50,98,0.035) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .frame {
+    position: relative;
+    padding: 14px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(0,50,98,0.25);
+  }
+  .frame::before, .frame::after,
+  .frame .corner-br, .frame .corner-bl {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-color: #003262;
+    opacity: 0.55;
+  }
+  .frame::before { top: 6px; left: 6px; border-top: 2px solid; border-left: 2px solid; }
+  .frame::after { top: 6px; right: 6px; border-top: 2px solid; border-right: 2px solid; }
+  .frame .corner-bl { bottom: 6px; left: 6px; border-bottom: 2px solid; border-left: 2px solid; }
+  .frame .corner-br { bottom: 6px; right: 6px; border-bottom: 2px solid; border-right: 2px solid; }
+  .readout {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+  }
+  .placeholder {
+    border: 1.5px dashed rgba(0,50,98,0.3);
+    background: repeating-linear-gradient(
+      135deg,
+      rgba(0,50,98,0.03),
+      rgba(0,50,98,0.03) 8px,
+      transparent 8px,
+      transparent 16px
+    );
+  }
+  .sprocket {
+    background-image: radial-gradient(circle, #FAF6EC 3px, transparent 3px);
+    background-size: 18px 18px;
+    background-position: 9px center;
+  }
+</style>
+</head>
+<body class="text-ink font-sans">
+
+<!-- header -->
+<header class="border-b border-berkeley/15">
+  <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+    <a href="../index.html" class="readout text-berkeley/70 hover:text-berkeley transition-colors">&larr; all projects</a>
+    <span class="readout text-berkeley/50">CS 180 &middot; Project 1</span>
+  </div>
+</header>
+
+<!-- hero -->
+<section class="max-w-5xl mx-auto px-6 pt-16 pb-14">
+  <p class="readout text-founders mb-4">Programming Project #1</p>
+  <h1 class="font-serif text-4xl md:text-5xl leading-[1.15] text-berkeley max-w-3xl">
+    Images of the Russian Empire
+  </h1>
+  <p class="font-serif text-xl md:text-2xl text-ink/70 mt-3 max-w-2xl">
+    Colorizing the Prokudin&ndash;Gorskii glass plate collection
+  </p>
+  <p class="mt-6 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    Between 1907 and 1915, Sergei Prokudin-Gorskii photographed the Russian Empire in
+    color, decades before color film existed. He did so by exposing three black-and-white
+    plates of the same scene through red, green, and blue filters. Reconstructing the
+    color photo means finding the small pixel shift that aligns the three plates back
+    together. This project builds that alignment pipeline: an exhaustive search over
+    candidate shifts for small images, and a coarse-to-fine image pyramid for the
+    full-resolution scans, where an exhaustive search alone is too slow.
+  </p>
+
+  <div class="frame mt-12 max-w-2xl">
+    <span class="corner-bl"></span><span class="corner-br"></span>
+    <img src="media/cathedral_l2.jpg" alt="Aligned color photo of a cathedral, reconstructed from three separate glass plate exposures" class="w-full">
+    <div class="flex justify-between items-center mt-2 px-1">
+      <span class="readout text-ink/50">cathedral.jpg &middot; L2, single-scale</span>
+      <span class="readout text-founders">dx +2, dy +5 (G) &middot; dx +3, dy +12 (R)</span>
+    </div>
+  </div>
+</section>
+
+<!-- method: single scale -->
+<section class="max-w-5xl mx-auto px-6 py-14 border-t border-berkeley/10">
+  <p class="readout text-founders mb-3">01 &middot; Method</p>
+  <h2 class="font-serif text-2xl md:text-3xl text-berkeley">Single-scale exhaustive search</h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    Each glass plate is one tall image, stacked B / G / R from top to bottom. After
+    splitting it into three equal thirds, the green and red channels are each shifted
+    by every candidate <code class="readout bg-berkeley/5 px-1 rounded">(dx, dy)</code>
+    in a &plusmn;15 pixel window and scored against the blue channel. Two scoring
+    metrics were implemented:
+  </p>
+  <div class="grid md:grid-cols-2 gap-6 mt-6 max-w-2xl">
+    <div class="border-l-2 border-founders/40 pl-4">
+      <p class="font-serif text-lg text-berkeley">L2 / Euclidean distance</p>
+      <p class="readout text-xs text-ink/60 mt-1">sqrt(sum((img1 &minus; img2)&sup2;))</p>
+      <p class="mt-2 text-sm text-ink/75 leading-relaxed">A difference measure &mdash; the shift that
+        <em>minimizes</em> this is kept.</p>
+    </div>
+    <div class="border-l-2 border-founders/40 pl-4">
+      <p class="font-serif text-lg text-berkeley">Normalized cross-correlation</p>
+      <p class="readout text-xs text-ink/60 mt-1">dot(img1&#772;, img2&#772;), mean-subtracted &amp; unit-normalized</p>
+      <p class="mt-2 text-sm text-ink/75 leading-relaxed">A similarity measure &mdash; the shift that
+        <em>maximizes</em> this is kept.</p>
+    </div>
+  </div>
+  <p class="mt-6 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    Each plate also carries its own black border on all four sides.
+    Scoring on the full channel let that border dominate the metric
+    and pulled the search toward the wrong shift, so both channels are cropped by 15%
+    on every side before scoring. The found shift is then applied to the
+    <em>full, uncropped</em> channel so no real image content is lost in the final output.
+  </p>
+</section>
+
+<!-- single scale results -->
+<section class="max-w-5xl mx-auto px-6 py-14 border-t border-berkeley/10">
+  <p class="readout text-founders mb-3">02 &middot; Results</p>
+  <h2 class="font-serif text-2xl md:text-3xl text-berkeley">Single-scale results, low-resolution JPEGs</h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    On the three provided low-res images, L2 and NCC agree exactly. I interpreted this as a good sign,
+    since two independently-implemented metrics converging on the same answer is
+    strong evidence the shift is correct.
+  </p>
+
+  <div class="grid md:grid-cols-3 gap-8 mt-10">
+    <!--CARDS:SINGLE-->
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/cathedral_l2.jpg" alt="Aligned cathedral" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">cathedral</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +2, dy +5 (G) &middot; dx +3, dy +12 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +2, dy +5 (G) &middot; dx +3, dy +12 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/monastery_l2.jpg" alt="Aligned monastery" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">monastery</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +2, dy -3 (G) &middot; dx +2, dy +3 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +2, dy -3 (G) &middot; dx +2, dy +3 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/tobolsk_l2.jpg" alt="Aligned tobolsk" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">tobolsk</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +3, dy +3 (G) &middot; dx +3, dy +6 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +3, dy +3 (G) &middot; dx +3, dy +6 (R)</td></tr>
+      </table>
+    </div>
+<!--END:SINGLE-->
+  </div>
+</section>
+
+<!-- method: pyramid -->
+<section class="max-w-5xl mx-auto px-6 py-14 border-t border-berkeley/10">
+  <p class="readout text-founders mb-3">03 &middot; Method</p>
+  <h2 class="font-serif text-2xl md:text-3xl text-berkeley">Coarse-to-fine image pyramid</h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    The full-resolution .tif scans are large enough that a &plusmn;15 window is both too
+    slow to search exhaustively and too narrow to contain the true displacement, which
+    scales up with resolution. The pyramid resolves both problems by recursing on
+    progressively half-sized versions of each channel:
+  </p>
+  <ol class="mt-6 space-y-3 max-w-2xl">
+    <li class="flex gap-3 text-sm text-ink/80"><span class="readout text-founders shrink-0">1</span>
+      Downsample both channels by 2&times; until the image is small &mdash; small enough that
+      an exhaustive &plusmn;15 search is both fast and guaranteed to contain the (now much
+      smaller) true shift.</li>
+    <li class="flex gap-3 text-sm text-ink/80"><span class="readout text-founders shrink-0">2</span>
+      Solve at that coarsest scale, then double the found shift on the way back up &mdash;
+      a shift of <em>N</em> pixels at half-resolution corresponds to <em>2N</em> pixels at
+      full resolution.</li>
+    <li class="flex gap-3 text-sm text-ink/80"><span class="readout text-founders shrink-0">3</span>
+      At each finer level, refine with a small &plusmn;2 search centered on that doubled
+      estimate, correcting only for the rounding introduced by downsampling.</li>
+  </ol>
+  <p class="mt-6 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    Because the recursion bottoms out immediately for small images, this same function
+    reproduces the single-scale results above on the low-res JPEGs &mdash; no separate
+    code path was needed.
+  </p>
+</section>
+
+<!-- pyramid results -->
+<section class="max-w-5xl mx-auto px-6 py-14 border-t border-berkeley/10">
+  <p class="readout text-founders mb-3">04 &middot; Results</p>
+  <h2 class="font-serif text-2xl md:text-3xl text-berkeley">Pyramid results, full-resolution scans</h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    Offsets computed by the pyramid search on every provided example image.
+  </p>
+
+  <div class="grid md:grid-cols-3 gap-8 mt-10">
+    <!--CARDS:PYRAMID-->
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/church_l2.jpg" alt="Aligned church" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">church</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +4, dy +25 (G) &middot; dx -4, dy +58 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +4, dy +25 (G) &middot; dx -4, dy +58 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/emir_l2.jpg" alt="Aligned emir" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">emir</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +24, dy +49 (G) &middot; dx -168, dy +5 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +24, dy +49 (G) &middot; dx -168, dy +5 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/harvesters_l2.jpg" alt="Aligned harvesters" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">harvesters</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +17, dy +59 (G) &middot; dx +13, dy +123 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +17, dy +59 (G) &middot; dx +13, dy +123 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/icon_l2.jpg" alt="Aligned icon" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">icon</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +17, dy +41 (G) &middot; dx +23, dy +89 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +17, dy +41 (G) &middot; dx +23, dy +89 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/ilemselga_l2.jpg" alt="Aligned ilemselga" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">ilemselga</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +7, dy +40 (G) &middot; dx +11, dy +131 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +7, dy +40 (G) &middot; dx +11, dy +131 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/melons_l2.jpg" alt="Aligned melons" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">melons</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +10, dy +81 (G) &middot; dx +12, dy +174 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +10, dy +81 (G) &middot; dx +12, dy +174 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/religious_painting_l2.jpg" alt="Aligned religious_painting" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">religious_painting</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +2, dy +28 (G) &middot; dx +7, dy +69 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +2, dy +28 (G) &middot; dx +7, dy +69 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/self_portrait_l2.jpg" alt="Aligned self_portrait" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">self_portrait</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +29, dy +78 (G) &middot; dx +36, dy +174 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +29, dy +78 (G) &middot; dx +36, dy +174 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/siren_l2.jpg" alt="Aligned siren" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">siren</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx -6, dy +49 (G) &middot; dx -24, dy +96 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx -6, dy +49 (G) &middot; dx -24, dy +96 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/three_generations_l2.jpg" alt="Aligned three_generations" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">three_generations</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +13, dy +52 (G) &middot; dx +11, dy +111 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +13, dy +52 (G) &middot; dx +11, dy +111 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/wharf_l2.jpg" alt="Aligned wharf" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">wharf</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx -7, dy +15 (G) &middot; dx -16, dy +82 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx -7, dy +15 (G) &middot; dx -16, dy +82 (R)</td></tr>
+      </table>
+    </div>
+<!--END:PYRAMID-->
+  </div>
+</section>
+
+<!-- own examples -->
+<section class="max-w-5xl mx-auto px-6 py-14 border-t border-berkeley/10">
+  <p class="readout text-founders mb-3">05 &middot; Results</p>
+  <h2 class="font-serif text-2xl md:text-3xl text-berkeley">Additional examples from the collection</h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    Three more plates downloaded directly from the
+    <a href="https://www.loc.gov/collections/prokudin-gorskii/?st=grid" class="text-founders underline underline-offset-2">Library of Congress collection</a>,
+    run through the same pyramid pipeline.
+  </p>
+  <div class="grid md:grid-cols-3 gap-8 mt-10">
+    <!--CARDS:OWN-->
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/bashkir_woman_in_a_folk_costume_l2.jpg" alt="Aligned bashkir_woman_in_a_folk_costume" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">bashkir_woman_in_a_folk_costume</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx -5, dy +60 (G) &middot; dx -21, dy +130 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx -5, dy +60 (G) &middot; dx -21, dy +130 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/altar_image_in_the_church_of_john_the_theologian_l2.jpg" alt="Aligned altar_image_in_the_church_of_john_the_theologian" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">john_the_theologian</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +16, dy +20 (G) &middot; dx +17, dy +59 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +16, dy +20 (G) &middot; dx +17, dy +59 (R)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/at_harvest_time_l2.jpg" alt="Aligned at_harvest_time" class="w-full">
+      </div>
+      <p class="font-serif text-lg text-berkeley mt-3">at_harvest_time</p>
+      <table class="readout text-xs text-ink/70 mt-2 w-full">
+        <tr><td class="py-0.5 pr-2">L2</td><td>dx +27, dy +24 (G) &middot; dx +39, dy +144 (R)</td></tr>
+        <tr><td class="py-0.5 pr-2">NCC</td><td>dx +27, dy +24 (G) &middot; dx +39, dy +144 (R)</td></tr>
+      </table>
+    </div>
+<!--END:OWN-->
+  </div>
+</section>
+
+<!-- failure case -->
+<section class="max-w-5xl mx-auto px-6 py-14 border-t border-berkeley/10">
+  <p class="readout text-founders mb-3">06 &middot; Where it broke</p>
+  <h2 class="font-serif text-2xl md:text-3xl text-berkeley">The Emir of Bukhara</h2>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    <code class="readout bg-berkeley/5 px-1 rounded">emir.tif</code> is the one image
+    the assignment itself flags as a hard case &mdash; the three exposures don't share
+    the same brightness relationships the way they do in the other plates, so a metric
+    built on raw pixel values (both L2 and NCC here) isn't guaranteed to find the shift
+    that's actually correct.
+  </p>
+
+  <div class="grid md:grid-cols-2 gap-8 mt-10 max-w-3xl">
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/emir_l2.jpg" alt="Emir of Bukhara, aligned with L2, showing a residual ghost around the head" class="w-full">
+      </div>
+      <p class="readout text-ink/50 mt-2">L2 &middot; dx +24, dy +49 (G)</p>
+    </div>
+    <div>
+      <div class="frame">
+        <span class="corner-bl"></span><span class="corner-br"></span>
+        <img src="media/emir_ncc.jpg" alt="Emir of Bukhara, aligned with NCC, showing the same residual ghost" class="w-full">
+      </div>
+      <p class="readout text-ink/50 mt-2">NCC &middot; dx +24, dy +49 (G)</p>
+    </div>
+  </div>
+
+  <p class="mt-8 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    The green channel converges cleanly and the robe, floor, and doorway all align well
+    under both metrics. The red channel is the harder problem: a narrow search window
+    pins the result to its own edge (evidence the true shift lies further out), but
+    widening the window lets the search wander to a shift that scores better under raw
+    pixel L2/NCC while visibly <em>worsening</em> alignment across the whole frame &mdash;
+    a false optimum, not a real improvement. What's left in the images above is a single
+    ghosted outline around the Emir's head and shoulder, most likely because he shifted
+    slightly during the several-second gap between the sequential color exposures &mdash;
+    something no global translation can correct, regardless of the metric used to find it.
+  </p>
+  <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/80">
+    This is the one image left imperfectly aligned in the final results.
+  </p>
+</section>
+
+<footer class="border-t border-berkeley/15 mt-4">
+  <div class="max-w-5xl mx-auto px-6 py-8 flex justify-between items-center">
+    <span class="readout text-ink/40">CS 180 &middot; Fall 2026</span>
+    <a href="../index.html" class="readout text-berkeley/70 hover:text-berkeley transition-colors">&larr; all projects</a>
+  </div>
+</footer>
+
+</body>
+</html>
