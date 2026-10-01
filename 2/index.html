@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CS180 Project 2: Filters and Frequencies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{
+  --blue: #003262;
+  --blue-deep: #001c3d;
+  --gold: #FDB515;
+  --rock: #3B7EA1;
+  --paper: #F4F3EE;
+}
+body{
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(rgba(0,50,98,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,50,98,0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  font-family: 'Inter', sans-serif;
+  color: var(--blue-deep);
+}
+.font-serif-display{ font-family: 'Source Serif 4', serif; }
+.font-mono{ font-family: 'IBM Plex Mono', monospace; }
+.section-tag{ font-family:'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--rock); letter-spacing:.02em; }
+
+.viewfinder{ position: relative; padding: 10px; }
+.viewfinder::before, .viewfinder::after,
+.viewfinder .vf-br, .viewfinder .vf-bl{
+  content:"";
+  position:absolute;
+  width: 16px; height: 16px;
+  border: 2.5px solid var(--gold);
+  z-index: 2;
+}
+.viewfinder::before{ top:0; left:0; border-right:none; border-bottom:none; }
+.viewfinder::after{ top:0; right:0; border-left:none; border-bottom:none; }
+.viewfinder .vf-bl{ bottom:0; left:0; border-right:none; border-top:none; }
+.viewfinder .vf-br{ bottom:0; right:0; border-left:none; border-top:none; }
+
+.proj-card img{ transition: transform .5s cubic-bezier(.22,.61,.36,1); }
+.proj-card:hover img{ transform: scale(1.035); }
+
+@keyframes riseIn{ from{ opacity:0; transform: translateY(14px);} to{ opacity:1; transform: translateY(0);} }
+.rise-in{ animation: riseIn 0.7s cubic-bezier(.22,.61,.36,1) both; }
+
+pre{ background:#fff; border:1px solid rgba(0,50,98,0.15); border-radius:8px; padding:16px; overflow:auto; font:13px/1.55 'IBM Plex Mono', monospace; color: var(--blue-deep); }
+code.i{ font-family:'IBM Plex Mono', monospace; background:rgba(0,50,98,0.06); padding:1px 6px; border-radius:4px; font-size:.88em; }
+details summary{ cursor:pointer; }
+details summary::marker{ color: var(--rock); }
+table{ border-collapse:collapse; width:100%; font-family:'Inter',sans-serif; font-size:14.5px; }
+td,th{ border-bottom:1px solid rgba(0,50,98,0.15); padding:7px 10px; text-align:right; }
+th:first-child,td:first-child{ text-align:left; }
+</style>
+</head>
+<body class="antialiased">
+
+<header class="sticky top-0 z-40 backdrop-blur bg-[#F4F3EE]/90 border-b border-[var(--blue)]/15">
+  <div class="max-w-5xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-y-2">
+    <div class="flex items-baseline gap-3">
+      <a href="../index.html" class="section-tag hover:text-[var(--gold)] transition-colors">&larr; All&nbsp;Projects</a>
+      <span class="font-serif-display text-lg font-semibold text-[var(--blue)]">Proj2</span>
+    </div>
+    <nav class="flex gap-4 flex-wrap text-xs sm:text-sm font-medium text-[var(--blue)] font-mono">
+      <a href="#p11" class="hover:text-[var(--gold)] transition-colors">1.1 Convolution</a>
+      <a href="#p12" class="hover:text-[var(--gold)] transition-colors">1.2 Finite&nbsp;diff</a>
+      <a href="#p13" class="hover:text-[var(--gold)] transition-colors">1.3 DoG</a>
+      <a href="#p21" class="hover:text-[var(--gold)] transition-colors">2.1 Sharpening</a>
+      <a href="#p22" class="hover:text-[var(--gold)] transition-colors">2.2 Hybrid</a>
+      <a href="#p23" class="hover:text-[var(--gold)] transition-colors">2.3 Stacks</a>
+      <a href="#p24" class="hover:text-[var(--gold)] transition-colors">2.4 Blending</a>
+      <a href="#learned" class="hover:text-[var(--gold)] transition-colors">Takeaway</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-6">
+
+  <section class="pt-14 pb-6 rise-in">
+    <p class="section-tag mb-2">CS180 &middot; Intro to Computer Vision and Computational Photography &middot; Project 2</p>
+    <h1 class="font-serif-display text-4xl sm:text-5xl font-semibold text-[var(--blue)] leading-tight">Fun with Filters and Frequencies</h1>
+    <!-- <p class="mt-3 text-[var(--blue-deep)]/70">Lucas</p> -->
+  </section>
+
+  <h2 id="part1" class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-16 pt-3 border-t-2 border-[var(--blue)]">Part 1: Fun with Filters</h2>
+
+  <h3 id="p11" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.1 Convolutions from scratch</h3>
+  <p class="my-3 leading-relaxed">I implemented 2D convolution with NumPy only, in two versions: four nested loops (output row, output column, kernel row, kernel column) and two loops (the inner kernel window becomes one vectorised <code class="i">np.sum</code> of a slice times the kernel). Both flip the kernel, as convolution requires, and both support zero-padding in <code class="i">same</code>, <code class="i">full</code> and <code class="i">valid</code> modes. <code class="i">same</code> pads by <code class="i">k//2</code> on each side so the output keeps the input's size; <code class="i">full</code> pads by <code class="i">k-1</code>.</p>
+
+  <details open class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: padding and both convolutions</summary><pre><code>def pad_image(image, ph, pw):
+    &quot;&quot;&quot;Zero-pad image by ph rows and pw columns&quot;&quot;&quot;
+    H, W = image.shape
+    padded = np.zeros((H + 2 * ph, W + 2 * pw), dtype=image.dtype)
+    padded[ph:ph + H, pw:pw + W] = image
+    return padded
+
+def _pad_for_mode(image, kh, kw, mode):
+    &quot;&quot;&quot;
+    full:
+    - (kh-1) rows, (kw-1) columns per side
+    - output size: (H + kh - 1) x (W + kw - 1)
+    same: (kh//2) rows, (kw//2) columns per side
+
+    valid: no padding
+    &quot;&quot;&quot;
+    if mode == &quot;full&quot;:
+        return pad_image(image, kh - 1, kw - 1)
+    if mode == &quot;same&quot;:
+        return pad_image(image, kh // 2, kw // 2)
+    if mode == &quot;valid&quot;:
+        return image
+    raise ValueError(&quot;mode must be &#x27;full, &#x27;same&#x27;, or &#x27;valid&#x27;&quot;)
+
+def conv_4loops(image, kernel, mode=&quot;same&quot;):
+    image = image.astype(np.float64)
+    kh, kw = kernel.shape
+    kflip = kernel[::-1, ::-1] # convolution flips the kernel
+    padded = _pad_for_mode(image, kh, kw, mode)
+    out_h = padded.shape[0] - kh + 1
+    out_w = padded.shape[1] - kw + 1
+    out = np.zeros((out_h, out_w))
+    for i in range(out_h):          # 1. which output row
+        for j in range(out_w):      # 2. which output column
+            for u in range(kh):     # 3. which row inside the kernel window
+                for v in range(kw): # 4. which column inside the kernel window
+                    out[i, j] += padded[i + u, j + v] * kflip[u, v]
+
+    return out
+
+def conv_2loops(image, kernel, mode=&quot;same&quot;):
+    image = image.astype(np.float64)
+    kh, kw = kernel.shape
+    kflip = kernel[::-1, ::-1]
+    padded = _pad_for_mode(image, kh, kw, mode)
+    out_h = padded.shape[0] - kh + 1
+    out_w = padded.shape[1] - kw + 1
+    out = np.zeros((out_h, out_w))
+    for i in range(out_h):
+        for j in range(out_w):
+            out[i, j] = np.sum(padded[i:i+kh, j:j+kw] * kflip)
+
+    return out</code></pre></details>
+
+  <p class="my-3 leading-relaxed"><b>Comparison with <code class="i">scipy.signal.convolve2d</code>.</b> On a 110&times;165 downscaled copy of my selfie (so the four-loop version finishes quickly), all three implementations agree with SciPy's zero-filled <code class="i">same</code> output to floating-point precision (max abs difference &le; 9e-16).</p>
+  <table class="my-4"><tr><th>Filter</th><th>4 loops</th><th>2 loops</th><th>scipy</th></tr>
+  <tr><td>9&times;9 box</td><td>0.992 s</td><td>0.089 s</td><td>0.0035 s</td></tr>
+  <tr><td>D<sub>x</sub> (1&times;3)</td><td>0.039 s</td><td>0.084 s</td><td>0.00035 s</td></tr>
+  <tr><td>D<sub>y</sub> (3&times;1)</td><td>0.046 s</td><td>0.093 s</td><td>0.00065 s</td></tr></table>
+  <p class="my-3 leading-relaxed">Runtime depends on kernel size. The four-loop version does one Python-level multiply-add per kernel element per pixel, so the 9&times;9 box (81 taps) is about 11&times; slower than the two-loop version, which pushes the window work into NumPy. For the tiny 1&times;3 and 3&times;1 kernels the two-loop version is actually a little slower, because the per-pixel overhead of slicing and <code class="i">np.sum</code> outweighs the saved loop iterations. SciPy is one to two orders of magnitude faster than even my two-loop version (and about 100&times; faster on the 1&times;3 kernels) because it runs in compiled C. On boundaries: my code and SciPy's default zero-fill treat out-of-image pixels as 0, which darkens borders after blurring and creates a bright fake edge on derivatives. In Part 1.2 onward I use <code class="i">boundary="symm"</code> (mirror) to avoid that.</p>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/selfie.jpeg" alt="Original (grayscale used for filtering)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Original (grayscale used for filtering)</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/blur.png" alt="9×9 box filter" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">9&times;9 box filter</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/dx.png" alt="Convolved with Dx = [1, 0, −1]" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Convolved with D<sub>x</sub> = [1, 0, &minus;1]</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/dy.png" alt="Convolved with Dy = [1, 0, −1]ᵀ" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Convolved with D<sub>y</sub> = [1, 0, &minus;1]&#7488;</figcaption></figure>
+  </div>
+
+  <h3 id="p12" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.2 Finite difference operator</h3>
+  <p class="my-3 leading-relaxed">Convolving the cameraman image with D<sub>x</sub> and D<sub>y</sub> gives the partial derivatives; the gradient magnitude is &radic;(g<sub>x</sub>&sup2; + g<sub>y</sub>&sup2;). Binarizing the magnitude at a threshold gives an edge map. I tried several thresholds and chose <b>0.25</b>: lower values let the grainy texture of the background through as speckle, while higher values began to break up the real outlines. It is a tradeoff, and I accepted losing a few faint edges to keep the background clean.</p>
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/cameraman.png" alt="Original" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Original</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gx.png" alt="Partial derivative in x" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Partial derivative in x</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gy.png" alt="Partial derivative in y" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Partial derivative in y</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/mag.png" alt="Gradient magnitude" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Gradient magnitude</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edges.png" alt="Binarized edges (threshold 0.25)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Binarized edges (threshold 0.25)</figcaption></figure>
+  </div>
+  <details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code</summary><pre><code>def binarize(m, threshold):
+    return (m &gt; threshold).astype(np.float64)
+
+def gradient_magnitude(img, Dx, Dy):
+    # Partial derivatives
+    # boundary=&quot;symm&quot; mirrors the edges, which avoids the fake bright border with zero padding
+    gx = convolve2d(img, Dx, mode=&quot;same&quot;, boundary=&quot;symm&quot;)
+    gy = convolve2d(img, Dy, mode=&quot;same&quot;, boundary=&quot;symm&quot;)
+
+    # Calculate magnitude of gradient (i.e., how strong the edge is at each pixel)
+    mag = np.sqrt(gx**2 + gy**2)
+
+    return gx, gy, mag</code></pre></details>
+
+  <h3 id="p13" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.3 Derivative of Gaussian (DoG) filter</h3>
+  <p class="my-3 leading-relaxed">The plain finite difference result is noisy, so I first smoothed the image with a Gaussian (&sigma; = 3, kernel size 2&middot;&lceil;3&sigma;&rceil;+1 = 19, built with <code class="i">cv2.getGaussianKernel</code> and an outer product) and then repeated the pipeline. The edges are thicker and smoother and the noise is largely gone, which let me use a much lower binarization threshold (<b>0.055</b>, since blurring shrinks gradient magnitudes). The tradeoff is that fine detail is blurred away.</p>
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/cameraman_blur_sigma=3.png" alt="Gaussian-blurred, σ = 3" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Gaussian-blurred, &sigma; = 3</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gx_blur.png" alt="∂/∂x of blurred" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">&part;/&part;x of blurred</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gy_blur.png" alt="∂/∂y of blurred" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">&part;/&part;y of blurred</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/mag_blur.png" alt="Gradient magnitude" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Gradient magnitude</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edges_blur.png" alt="Binarized (threshold 0.055)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Binarized (threshold 0.055)</figcaption></figure>
+  </div>
+  <p class="my-3 leading-relaxed">Because convolution is associative, blur-then-differentiate equals convolving once with a derivative-of-Gaussian filter: DoG<sub>x</sub> = G &lowast; D<sub>x</sub>, DoG<sub>y</sub> = G &lowast; D<sub>y</sub> (computed with <code class="i">mode="full"</code> so nothing is cropped). I checked that the two routes agree: away from the border, where padding differs, the results match with <code class="i">np.allclose</code> and a maximum absolute difference of 1.5e-15.</p>
+  <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/DoG_x_filter.png" alt="DoGx filter (19×21)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">DoG<sub>x</sub> filter (19&times;21)</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/DoG_y_filter.png" alt="DoGy filter (21×19)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">DoG<sub>y</sub> filter (21&times;19)</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gx_DoG.png" alt="Original ∗ DoGx" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Original &lowast; DoG<sub>x</sub></figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gy_DoG.png" alt="Original ∗ DoGy" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Original &lowast; DoG<sub>y</sub></figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/mag_DoG.png" alt="DoG gradient magnitude" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">DoG gradient magnitude</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edges_DoG.png" alt="DoG edges (threshold 0.055)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">DoG edges (threshold 0.055)</figcaption></figure>
+  </div>
+  <details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code</summary><pre><code># Gaussian, then DoG filters
+gauss_1d = cv2.getGaussianKernel(ksize, sigma)
+gauss_2d = gauss_1d @ gauss_1d.T
+DoG_x = convolve2d(gauss_2d, Dx, mode="full")
+DoG_y = convolve2d(gauss_2d, Dy, mode="full")
+gx_DoG = convolve2d(img, DoG_x, mode="same", boundary="symm")
+gy_DoG = convolve2d(img, DoG_y, mode="same", boundary="symm")
+mag_dog = np.sqrt(gx_DoG**2 + gy_DoG**2)</code></pre></details>
+
+  <h2 id="part2" class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-16 pt-3 border-t-2 border-[var(--blue)]">Part 2: Fun with Frequencies</h2>
+
+  <h3 id="p21" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">2.1 Image sharpening (unsharp mask)</h3>
+  <p class="my-3 leading-relaxed">A Gaussian G is a low-pass filter, so <i>image &minus; G&lowast;image</i> keeps only the high frequencies (the detail). Adding &alpha; times that detail back gives a sharper-looking image: <i>sharp = f + &alpha;(f &minus; f&lowast;G)</i>. Because convolution is linear this collapses to one kernel, the <b>unsharp mask filter</b> <i>(1+&alpha;)&middot;&delta; &minus; &alpha;&middot;G</i>, where &delta; is the identity (impulse) filter. I apply it per colour channel with &sigma; = 2.</p>
+  <details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code</summary><pre><code>def impulse(ksize):
+    &quot;&quot;&quot;The identity filter (convolving with this returns unchanged image)&quot;&quot;&quot;
+    d = np.zeros((ksize, ksize))
+    d[ksize // 2, ksize // 2] = 1.0
+    return d
+
+def apply_per_channel(img, kernel):
+    &quot;&quot;&quot;Convolve each of the H x W x 3 channels separately, then restack.&quot;&quot;&quot;
+    out = np.zeros_like(img)
+    for c in range(3):
+        out[..., c] = convolve2d(img[..., c], kernel, mode=&quot;same&quot;, boundary=&quot;symm&quot;)
+    return out
+
+def sharpen_two_steps(img, G, alpha):
+    blur = apply_per_channel(img, G)
+    detail = img - blur
+    return img + alpha * detail
+
+def sharpen_one_kernel(img, G, alpha):
+    delta = impulse(G.shape[0])
+    kernel = (1 + alpha) * delta - alpha * G
+    return apply_per_channel(img, kernel)</code></pre></details>
+  <div class="grid grid-cols-2 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/original_for_sharpen.png" alt="Taj Mahal, original" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Taj Mahal, original</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/sharpen_alpha=1.png" alt="Sharpened, α = 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Sharpened, &alpha; = 1</figcaption></figure>
+  </div>
+  <p class="my-3 leading-relaxed">Larger &alpha; pushes more high-frequency energy back in, giving crisper edges but also halos and amplified noise.</p>
+  <div class="grid grid-cols-2 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/blur_sunset.jpeg" alt="Blurry sunset photo (input)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Blurry sunset photo (input)</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/sharpen_selfie.png" alt="Another image of my choice: selfie, sharpened" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Another image of my choice: selfie, sharpened</figcaption></figure>
+  </div>
+  <h4 class="font-serif-display text-base font-semibold text-[var(--blue)] mt-6 mb-1">Evaluation: blur a sharp photo, then sharpen it again</h4>
+  <p class="my-3 leading-relaxed">I blurred a sharp photo with &sigma; = 5, then applied the unsharp mask (&alpha; = 5). Sharpening restores the appearance of edges but cannot bring back detail that blurring removed: the re-sharpened image looks crisper than the blurred one yet is not identical to the original, since the finest texture is gone for good and a large &alpha; can exaggerate noise and edges. Left to right: original, blurred, re-sharpened.</p>
+  <figure class="viewfinder overflow-hidden bg-black my-5"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/sharpen_evaluation.png" alt="Original, blurred and re-sharpened" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Original &middot; blurred (&sigma; = 5) &middot; re-sharpened (&alpha; = 5)</figcaption></figure>
+
+  <h3 id="p22" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">2.2 Hybrid images</h3>
+  <p class="my-3 leading-relaxed">Following Oliva, Torralba and Schyns, a hybrid image is the low-pass of one image (Gaussian, &sigma;<sub>1</sub>) plus the high-pass of another (the image minus its Gaussian, &sigma;<sub>2</sub>). Up close the high frequencies dominate; from far away only the low frequencies remain, so the interpretation changes with viewing distance. Aligning the two images on key features (e.g. the eyes) matters a lot for the effect.</p>
+  <details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code</summary><pre><code>def align_images(im1, im2, pts1, pts2):
+    &quot;&quot;&quot;pts1, pts2: [(x1,y1),(x2,y2)] two corresponding points in each image
+    (e.g. two eyes). Crops/scales/translates im2 to align with im1. 2D grayscale in/out.&quot;&quot;&quot;
+    (x1a, y1a), (x1b, y1b) = pts1
+    (x2a, y2a), (x2b, y2b) = pts2
+    d1 = np.hypot(x1b - x1a, y1b - y1a)
+    d2 = np.hypot(x2b - x2a, y2b - y2a)
+    scale = d1 / d2
+    im2_scaled = transform.rescale(im2, scale)
+    x2a, y2a = x2a * scale, y2a * scale
+    dy, dx = int(y1a - y2a), int(x1a - x2a)
+    canvas = np.zeros(im1.shape)
+    h, w = im2_scaled.shape
+    y0, x0 = max(0, dy), max(0, dx)
+    y1_, x1_ = min(im1.shape[0], dy + h), min(im1.shape[1], dx + w)
+    sy0, sx0 = y0 - dy, x0 - dx
+    canvas[y0:y1_, x0:x1_] = im2_scaled[sy0:sy0 + (y1_ - y0), sx0:sx0 + (x1_ - x0)]
+    return canvas
+
+def hybrid_image(im1, im2, sigma1, sigma2):
+    &quot;&quot;&quot;im1: low freq source, im2: high freq source. Both 2D grayscale, same shape, aligned.&quot;&quot;&quot;
+    G1 = gaussian_kernel(sigma1)
+    G2 = gaussian_kernel(sigma2)
+    low = convolve2d(im1, G1, mode=&quot;same&quot;, boundary=&quot;symm&quot;)
+    high = im2 - convolve2d(im2, G2, mode=&quot;same&quot;, boundary=&quot;symm&quot;)
+    hybrid = low + high
+    return np.clip(hybrid, 0, 1), low, high</code></pre></details>
+  <h4 class="font-serif-display text-base font-semibold text-[var(--blue)] mt-6 mb-1">Hybrid 1: me + Iron Man</h4>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/im1.png" alt="Low-frequency source" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Low-frequency source</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/im2.png" alt="High-frequency source" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">High-frequency source</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/hybrid_1.png" alt="Hybrid" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Hybrid</figcaption></figure>
+  </div>
+  <h4 class="font-serif-display text-base font-semibold text-[var(--blue)] mt-6 mb-1">Hybrid 2: cat + me</h4>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/im1_2.jpg" alt="Low-frequency source" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Low-frequency source</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/im2_2.jpeg" alt="High-frequency source" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">High-frequency source</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/hybrid_2.png" alt="Hybrid" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Hybrid</figcaption></figure>
+  </div>
+  <h4 class="font-serif-display text-base font-semibold text-[var(--blue)] mt-6 mb-1">Hybrid 3 (favourite): full process</h4>
+  <p class="my-3 leading-relaxed">Cutoffs: Gaussian &sigma; = 6 for the low-pass image and &sigma; = 14 for the image being high-passed (found by experimentation). The low-pass keeps what survives a &sigma; = 6 blur, so the first face stays recognisable from far away. The high-pass is the image minus a &sigma; = 14 blur: a larger &sigma;<sub>2</sub> lowers the cutoff and lets more mid-frequency detail through, while a smaller &sigma;<sub>2</sub> would leave only the very finest detail, so &sigma;<sub>2</sub> controls how strongly the second face competes with the first. The log-magnitude Fourier transforms show it: the low-passed image concentrates its energy near the centre (low frequencies), the high-passed image has had that centre removed, and the hybrid contains both.</p>
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/im1_3.jpeg" alt="Input 1 (low-frequency)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Input 1 (low-frequency)</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/im2_3.jpeg" alt="Input 2 (high-frequency)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Input 2 (high-frequency)</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/hybrid_low_3.png" alt="Input 1, low-passed (σ = 6)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Input 1, low-passed (&sigma; = 6)</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/hybrid_high_3.png" alt="Input 2, high-passed (σ = 14, +0.5 for display)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Input 2, high-passed (&sigma; = 14, +0.5 for display)</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/hybrid_3.png" alt="Hybrid result" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Hybrid result</figcaption></figure>
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/fft_im1.png" alt="FFT: input 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">FFT: input 1</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/fft_im2.png" alt="FFT: input 2" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">FFT: input 2</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/fft_low.png" alt="FFT: low-passed" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">FFT: low-passed</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/fft_high.png" alt="FFT: high-passed" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">FFT: high-passed</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/fft_hybrid.png" alt="FFT: hybrid" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">FFT: hybrid</figcaption></figure>
+  </div>
+
+  <h3 id="p23" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">2.3 Gaussian and Laplacian stacks</h3>
+  <p class="my-3 leading-relaxed">A stack is like a pyramid without downsampling, so every level has the full resolution. Level <i>i</i> of the Gaussian stack is the previous level blurred again, with &sigma; doubling each level (&sigma; = 2, 2, 4, 8, &hellip;). The Laplacian stack is the difference of consecutive Gaussian levels, with the last level being the final (most blurred) Gaussian level, so the Laplacian levels sum exactly back to the original image. I implemented both from scratch (no <code class="i">pyrDown</code>).</p>
+  <details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code</summary><pre><code>def gaussian_stack(img, sigma, levels):
+    &quot;&quot;&quot;Same size at every level (no downsampling), sigma grows each level.&quot;&quot;&quot;
+    stack = [img]
+    for i in range(1, levels):
+        G = gaussian_kernel(sigma * (2 ** (i - 1)))   # widen the blur each level
+        stack.append(apply_per_channel(stack[-1], G))
+    return stack
+
+def laplacian_stack(gstack):
+    lstack = [gstack[i] - gstack[i + 1] for i in range(len(gstack) - 1)]
+    lstack.append(gstack[-1])   # last level = final Gaussian level (so it all sums back)
+    return lstack</code></pre></details>
+  <p class="my-3 leading-relaxed">Apple, 5 levels. Top: Gaussian stack. Bottom: Laplacian stack (offset by +0.5 for display, except the last level).</p>
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gstack_0.png" alt="Gaussian level 0" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Gaussian level 0</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gstack_1.png" alt="Gaussian level 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Gaussian level 1</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gstack_2.png" alt="Gaussian level 2" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Gaussian level 2</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gstack_3.png" alt="Gaussian level 3" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Gaussian level 3</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/gstack_4.png" alt="Gaussian level 4" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Gaussian level 4</figcaption></figure>
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/lstack_0.png" alt="Laplacian level 0" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Laplacian level 0</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/lstack_1.png" alt="Laplacian level 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Laplacian level 1</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/lstack_2.png" alt="Laplacian level 2" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Laplacian level 2</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/lstack_3.png" alt="Laplacian level 3" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Laplacian level 3</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/lstack_4.png" alt="Laplacian level 4" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Laplacian level 4</figcaption></figure>
+  </div>
+
+  <h3 id="p24" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">2.4 Multiresolution blending</h3>
+  <p class="my-3 leading-relaxed">To blend images A and B, I build Laplacian stacks of both and a <i>Gaussian</i> stack of the mask. At each level the result is <i>mask<sub>i</sub>&middot;L<sub>A,i</sub> + (1 &minus; mask<sub>i</sub>)&middot;L<sub>B,i</sub></i>; summing all levels gives the blend. Blurring the mask progressively means high frequencies are joined along a sharp seam and low frequencies along a very soft one, which hides the transition.</p>
+  <details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code</summary><pre><code>def blend(imA, imB, mask, sigma=2, levels=5):
+    &quot;&quot;&quot;mask: same H,W as imA/imB, values in [0,1], 1 = show imA, 0 = show imB.&quot;&quot;&quot;
+    mask3 = np.repeat(mask[:, :, None], 3, axis=2) if mask.ndim == 2 else mask
+
+    LA = laplacian_stack(gaussian_stack(imA, sigma, levels))
+    LB = laplacian_stack(gaussian_stack(imB, sigma, levels))
+    GR = gaussian_stack(mask3, sigma, levels)   # blur the mask too -&gt; smooth transition
+
+    blended_stack = [GR[i] * LA[i] + (1 - GR[i]) * LB[i] for i in range(levels)]
+    result = sum(blended_stack)
+    return np.clip(result, 0, 1)</code></pre></details>
+  <div class="grid grid-cols-3 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/apple.jpeg" alt="Apple" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Apple</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/orange.jpeg" alt="Orange" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Orange</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/oraple.png" alt="The Oraple (vertical seam)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">The Oraple (vertical seam)</figcaption></figure>
+  </div>
+  <h3 class="font-serif-display text-base font-semibold text-[var(--blue)] mt-6 mb-1">More blends</h3>
+  <div class="grid grid-cols-3 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/chicken.jpg" alt="Image A" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Image A</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/trex.jpg" alt="Image B" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Image B</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/chickrex.png" alt="Chicken + T. rex (vertical seam)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Chicken + T. rex (vertical seam)</figcaption></figure>
+  </div>
+  <p class="my-3 leading-relaxed"><b>Irregular masks.</b> Two blends use non-straight masks: an ellipse (T. rex head over a landscape) and a hand-drawn polygon (Luke over Middle-earth, mask clicked out with <code class="i">draw_mask.py</code>), plus a fruit blend with an elliptical mask.</p>
+  <div class="grid grid-cols-3 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/trex.jpg" alt="Image A" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Image A</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/landscape.jpeg" alt="Image B" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Image B</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/dino_rainbow.png" alt="Elliptical mask blend" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Elliptical mask blend</figcaption></figure>
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/luke_skywalker.jpg" alt="Image A" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Image A</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/middle_earth.jpeg" alt="Image B" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Image B</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/custom_mask.png" alt="Hand-drawn mask" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Hand-drawn mask</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/luke_middle_earth.png" alt="Blend" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Blend</figcaption></figure>
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 my-5">
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/blackberry.png" alt="Image A" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Image A</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/raspberry.jpg" alt="Image B" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Image B</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/irregular_mask_1.png" alt="Mask" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Mask</figcaption></figure>
+    <figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/blaspberry.png" alt="Blend" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Blend</figcaption></figure>
+  </div>
+
+  <h2 id="learned" class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-16 pt-3 border-t-2 border-[var(--blue)]">The most important thing I learned</h2>
+  <p class="my-3 leading-relaxed">Almost every image-processing operation in this project is the same operation, convolution, with a different kernel. It is very helpful thinking in frequencies: edges are high frequencies, blurs are low-pass filters, sharpening boosts the high band, and hybrid images and seamless blends work by treating each frequency band separately.</p>
+
+</main>
+
+<footer class="border-t border-[var(--blue)]/15 mt-16">
+  <div class="max-w-5xl mx-auto px-6 py-8 flex flex-wrap justify-between items-center gap-3">
+    <!-- <span class="section-tag text-[var(--blue-deep)]/50">Code: part1_1.py &hellip; part2_4.py &middot; Built with NumPy, SciPy, OpenCV (Gaussian kernels only) and scikit-image (I/O).</span> -->
+    <a href="../index.html" class="section-tag hover:text-[var(--gold)] transition-colors">&larr; All&nbsp;Projects</a>
+  </div>
+</footer>
+
+</body></html>
