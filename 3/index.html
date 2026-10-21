@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CS180 Project 3: Flow Matching</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{
+  --blue: #003262;
+  --blue-deep: #001c3d;
+  --gold: #FDB515;
+  --rock: #3B7EA1;
+  --paper: #F4F3EE;
+}
+body{
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(rgba(0,50,98,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,50,98,0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  font-family: 'Inter', sans-serif;
+  color: var(--blue-deep);
+}
+.font-serif-display{ font-family: 'Source Serif 4', serif; }
+.font-mono{ font-family: 'IBM Plex Mono', monospace; }
+.section-tag{ font-family:'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--rock); letter-spacing:.02em; }
+
+.viewfinder{ position: relative; padding: 10px; }
+.viewfinder::before, .viewfinder::after,
+.viewfinder .vf-br, .viewfinder .vf-bl{
+  content:"";
+  position:absolute;
+  width: 16px; height: 16px;
+  border: 2.5px solid var(--gold);
+  z-index: 2;
+}
+.viewfinder::before{ top:0; left:0; border-right:none; border-bottom:none; }
+.viewfinder::after{ top:0; right:0; border-left:none; border-bottom:none; }
+.viewfinder .vf-bl{ bottom:0; left:0; border-right:none; border-top:none; }
+.viewfinder .vf-br{ bottom:0; right:0; border-left:none; border-top:none; }
+
+.proj-card img{ transition: transform .5s cubic-bezier(.22,.61,.36,1); }
+.proj-card:hover img{ transform: scale(1.035); }
+
+@keyframes riseIn{ from{ opacity:0; transform: translateY(14px);} to{ opacity:1; transform: translateY(0);} }
+.rise-in{ animation: riseIn 0.7s cubic-bezier(.22,.61,.36,1) both; }
+
+pre{ background:#fff; border:1px solid rgba(0,50,98,0.15); border-radius:8px; padding:16px; overflow:auto; font:13px/1.55 'IBM Plex Mono', monospace; color: var(--blue-deep); }
+code.i{ font-family:'IBM Plex Mono', monospace; background:rgba(0,50,98,0.06); padding:1px 6px; border-radius:4px; font-size:.88em; }
+details summary{ cursor:pointer; }
+details summary::marker{ color: var(--rock); }
+table{ border-collapse:collapse; width:100%; font-family:'Inter',sans-serif; font-size:14.5px; }
+td,th{ border-bottom:1px solid rgba(0,50,98,0.15); padding:7px 10px; text-align:right; }
+th:first-child,td:first-child{ text-align:left; }
+</style>
+</head>
+<body class="antialiased">
+
+<header class="sticky top-0 z-40 backdrop-blur bg-[#F4F3EE]/90 border-b border-[var(--blue)]/15">
+  <div class="max-w-5xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-y-2">
+    <div class="flex items-baseline gap-3">
+      <a href="../index.html" class="section-tag hover:text-[var(--gold)] transition-colors">&larr; All&nbsp;Projects</a>
+      <span class="font-serif-display text-lg font-semibold text-[var(--blue)]">Proj3</span>
+    </div>
+    <nav class="flex gap-4 flex-wrap text-xs sm:text-sm font-medium text-[var(--blue)] font-mono">
+      <a href="#a11" class="hover:text-[var(--gold)] transition-colors">1.1 Noise</a>
+      <a href="#a13" class="hover:text-[var(--gold)] transition-colors">1.3 One step</a>
+      <a href="#a15" class="hover:text-[var(--gold)] transition-colors">1.5 Euler</a>
+      <a href="#a2" class="hover:text-[var(--gold)] transition-colors">CFG</a>
+      <a href="#a31" class="hover:text-[var(--gold)] transition-colors">Edits</a>
+      <a href="#a33" class="hover:text-[var(--gold)] transition-colors">Anagrams</a>
+      <a href="#a34" class="hover:text-[var(--gold)] transition-colors">Hybrids</a>
+      <a href="#partB" class="hover:text-[var(--gold)] transition-colors">Part&nbsp;B</a>
+      <a href="#b2" class="hover:text-[var(--gold)] transition-colors">Time FM</a>
+      <a href="#b3" class="hover:text-[var(--gold)] transition-colors">Class FM</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-6">
+
+  <section class="pt-14 pb-6 rise-in">
+    <p class="section-tag mb-2">CS180 &middot; Intro to Computer Vision and Computational Photography &middot; Project 3</p>
+    <h1 class="font-serif-display text-4xl sm:text-5xl font-semibold text-[var(--blue)] leading-tight">Flow Matching and Diffusion Models</h1>
+  </section>
+
+<h2 id="partA" class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-16 pt-3 border-t-2 border-[var(--blue)]">Part A: The Power of Flow Models</h2>
+
+<p class="my-3 leading-relaxed">Part A uses a pretrained text-to-image flow model, <b>PixNerd</b> (<span class="font-mono text-sm">MCG-NJU/PixNerd-XXL-P16-T2I</span>), as a black box that predicts a <i>velocity</i>. Convention: <i>x<sub>t</sub> = (1 &minus; t)&middot;&epsilon; + t&middot;x<sub>1</sub></i>, so <b>t = 0 is pure noise and t = 1 is the clean image</b>, and the straight-line velocity from noise to image is <i>x<sub>1</sub> &minus; &epsilon;</i>. Images live in [&minus;1, 1], the seed is 180, and every sampler uses Euler steps of size h = 0.02.</p>
+
+<h3 id="a11" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.1 Noising an image</h3>
+
+<p class="my-3 leading-relaxed"><code class="i">interpolate(image, noise, t)</code> returns <i>(1 &minus; t)&epsilon; + t&middot;image</i>. Note this is a blend, not &ldquo;image + noise&rdquo;: the image is scaled by t as well, so at t = 0.25 the picture is mostly gone. The three columns are t = 0.25, 0.5 and 0.75 for my own photo (my cat, Skippy).</p>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/training_inputs.jpg" alt="Original, then t = 0.25, 0.5, 0.75" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Original, then t = 0.25, 0.5, 0.75</figcaption></figure>
+
+<h3 id="a12" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.2 Gaussian blur as a &ldquo;denoiser&rdquo; baseline</h3>
+
+<p class="my-3 leading-relaxed">Before using the model I tried the classical baseline: rescale the noisy image by 1/t so the signal is back at its original magnitude (the noise then has std (1 &minus; t)/t), and apply a Gaussian blur. Blurring does suppress the colourful speckle but it destroys the detail along with it. At the higher noise levels the cat is only a smear.</p>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/blur_0.jpg" alt="Blur baseline, t = 0.25" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Blur baseline, t = 0.25</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/blur_0.jpg" alt="Blur baseline, t = 0.5" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Blur baseline, t = 0.5</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/blur_0.jpg" alt="Blur baseline, t = 0.75" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Blur baseline, t = 0.75</figcaption></figure>
+</div>
+
+<h3 id="a13" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.3 One-step denoising</h3>
+
+<p class="my-3 leading-relaxed">The model predicts a velocity <i>v</i>. Moving along a straight line from <i>x<sub>t</sub></i> to t = 1 is <i>x&#770;<sub>1</sub> = x<sub>t</sub> + (1 &minus; t)&middot;v</i>. The velocity is <i>added</i> (extrapolated), not subtracted, because it points from noise toward the image.</p>
+
+<details open class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: one-step denoise and interpolation</summary><pre><code>def interpolate(image, noise, t):
+    return (1 - t) * noise + t * image
+
+def one_step_denoise(x, t, condition, predict_velocity):
+    v = predict_velocity(x, t, condition)
+    return x + (1 - t) * v</code></pre></details>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/one_step_0.jpg" alt="One step from t = 0.25: noisy input, one-step result, original" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">One step from t = 0.25: noisy input, one-step result, original</figcaption></figure>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/one_step_0.jpg" alt="t = 0.5" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">t = 0.5</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/one_step_0.jpg" alt="t = 0.75" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">t = 0.75</figcaption></figure>
+</div>
+
+<p class="my-3 leading-relaxed">From t = 0.5 and 0.75 one step already gives a clean-looking cat. From t = 0.25 a single step produces the right overall colours and shape but a smooth, slightly &ldquo;painted&rdquo; result: with so little signal left the model has to guess the fine texture, and one straight-line jump can only produce its average guess (the same reason blur-like averages show up in Part B).</p>
+
+<h3 id="a14" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.4 Looking at the velocity</h3>
+
+<p class="my-3 leading-relaxed"><code class="i">velocity_diagnostics</code> returns the model&rsquo;s update <i>(1 &minus; t)v&#770;</i>, the ground-truth update <i>(1 &minus; t)(x<sub>1</sub> &minus; &epsilon;)</i>, and a per-pixel RMS error averaged over RGB only. The predicted and true updates look almost the same, and the error is concentrated on edges and fine texture (Skippy&rsquo;s outline, whiskers, the bedspread pattern) while flat regions are nearly perfect.</p>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: velocity diagnostics</summary><pre><code>v_pred = predict_velocity(x_t, t, condition)
+v_gt = clean_image - epsilon                     # x_1 - epsilon
+predicted_update = (1 - t) * v_pred
+ground_truth_update = (1 - t) * v_gt             # equals x_1 - x_t
+error_map = ((predicted_update - ground_truth_update) ** 2).mean(dim=1).sqrt()</code></pre></details>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/velocity_0.jpg" alt="t = 0.25: noisy image, predicted update, ground-truth update, error" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">t = 0.25: noisy image, predicted update, ground-truth update, error</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/velocity_0.jpg" alt="t = 0.50" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">t = 0.50</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/velocity_0.jpg" alt="t = 0.75" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">t = 0.75</figcaption></figure>
+
+<h3 id="a15" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.5 Euler sampling</h3>
+
+<p class="my-3 leading-relaxed"><code class="i">euler_sample</code> integrates the flow: <i>x<sub>t+h</sub> = x<sub>t</sub> + h&middot;v(x<sub>t</sub>, t)</i>, re-querying the velocity at every step (so the path curves with the model&rsquo;s predictions instead of one straight jump). I compute time as <i>t<sub>start</sub> + i&middot;h</i> instead of repeatedly adding h so floating-point error cannot push t outside [0, 1], and shorten the last step so the final state is exactly t = 1. A small tolerance (1e-9) in the step count stops 0.93 + 0.02&times;k style arithmetic from creating a spurious extra step. The sampler is wrapped in <code class="i">torch.inference_mode()</code> and works in float32.</p>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: Euler sampler</summary><pre><code>@torch.inference_mode()
+def euler_sample(x_start, t_start, step_size, velocity):
+    x = x_start.to(torch.float32)
+    n_steps = max(0, math.ceil((1.0 - t_start) / step_size - 1e-9))
+    states = [(float(t_start), x)]
+    for i in range(n_steps):
+        t = t_start + i * step_size                 # time at the START of this step
+        h = min(step_size, 1.0 - t)                 # shorten the final step if needed
+        x = x + h * velocity(x, t)
+        is_last = i == n_steps - 1
+        if is_last or (i + 1) % 5 == 0:
+            states.append((1.0 if is_last else t_start + (i + 1) * step_size, x))
+    return x, states</code></pre></details>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/trajectory.jpg" alt="Euler trajectory from t = 0.25 (initial state, every fifth update, final state)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Euler trajectory from t = 0.25 (initial state, every fifth update, final state)</figcaption></figure>
+
+<p class="my-3 leading-relaxed">The table compares the three reconstructions of the cat from t = 0.25 against the original (pixel MSE in [&minus;1, 1] units, from my run):</p>
+
+<table class="my-4"><tr><th>Method</th><th>MSE</th></tr><tr><td>Gaussian blur</td><td>0.0123</td></tr><tr><td>One step</td><td>0.0039</td></tr><tr><td>Euler (50 steps)</td><td>0.0048</td></tr></table>
+
+<p class="my-3 leading-relaxed">Both flow-model results are far better than the blur baseline. One step has a slightly <i>lower</i> MSE than Euler, which is not a sign it looks better: MSE rewards the smooth &ldquo;average guess&rdquo; the one-step jump produces, while Euler commits to sharper detail that may differ from the original at the pixel level. Visually Euler is the crisper image (see the comparison below).</p>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/comparison.jpg" alt="Original, blur, one step, Euler (all from t = 0.25)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Original, blur, one step, Euler (all from t = 0.25)</figcaption></figure>
+
+<h3 id="a16" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.6 Unit tests</h3>
+
+<p class="my-3 leading-relaxed">The notebook&rsquo;s checks all pass: Euler takes exactly 50 steps from t = 0 and 25 from t = 0.5, the last step is shortened correctly, and the final time is exactly 1.</p>
+
+<h2 id="a2" class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-16 pt-3 border-t-2 border-[var(--blue)]">2: Classifier-free guidance</h2>
+
+<p class="my-3 leading-relaxed">Unconditional and conditional velocity predictions are combined as <i>v = v<sub>c</sub> + w&middot;(v<sub>c</sub> &minus; v<sub>u</sub>)</i> (the empty prompt gives <i>v<sub>u</sub></i>). With w = 0 this is plain conditional sampling; I use w = 7. Below are five samples from pure noise, seeds 180&ndash;184, first without guidance and then with w = 7. Guidance pushes the samples toward clean, well-composed portraits, while without it several samples show distorted faces and skin.</p>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: CFG velocity</summary><pre><code>def cfg_velocity(x, t, condition, w, predict_velocity, null_condition=''):
+    v_c = predict_velocity(x, t, condition)
+    v_u = predict_velocity(x, t, null_condition)
+    return v_c + w * (v_c - v_u)</code></pre></details>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/conditional_samples.jpg" alt="No guidance (w = 0), seeds 180&ndash;184" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">No guidance (w = 0), seeds 180&ndash;184</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/cfg_samples.jpg" alt="Classifier-free guidance, w = 7, seeds 180&ndash;184" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Classifier-free guidance, w = 7, seeds 180&ndash;184</figcaption></figure>
+
+<h2 id="a3" class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-16 pt-3 border-t-2 border-[var(--blue)]">3: Image-to-image translation and visual illusions</h2>
+
+<h3 id="a31" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">3.1 SDEdit-style editing</h3>
+
+<p class="my-3 leading-relaxed"><code class="i">edit</code> noises an image to <i>t<sub>start</sub></i> and denoises it back with CFG. Small <i>t<sub>start</sub></i> means more noise, so the output follows the prompt more and the original less. Each panel below goes through t<sub>start</sub> = 0.02, 0.04, 0.06, 0.10, 0.14, 0.25, 0.50. These panels show the plain edit (no extra prompt text) on the Campanile, my own photos (Skippy and a selfie), a web image (Geronimo Stilton) and two drawings (a pufferfish and a rainbow).
+Here, a generic prompt, <code class="i">"a high quality photo"</code> is used.</p>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: edit</summary><pre><code>def edit(image, noise, t_start, condition, predict_velocity, w=7, step_size=0.02):
+    x_t = interpolate(image, noise, t_start)
+    velocity = lambda x, t: cfg_velocity(x, t, condition, w, predict_velocity)
+    edited, _ = euler_sample(x_t, t_start, step_size, velocity)
+    return edited</code></pre></details>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edit_campanile.jpg" alt="Campanile" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Campanile</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edit_my_image_1.jpg" alt="Skippy" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Skippy</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edit_my_image_2.jpg" alt="A selfie with a dog mask" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">A selfie with a dog mask</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edit_web_image.jpg" alt="Geronimo Stilton web image" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Geronimo Stilton web image</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edit_drawing_1.jpg" alt="Hand-drawn rainbow" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Hand-drawn rainbow</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/edit_drawing_2.jpg" alt="Hand-drawn pufferfish" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Hand-drawn pufferfish</figcaption></figure>
+
+<p class="my-3 leading-relaxed">The trend is the same everywhere: at t<sub>start</sub> &le; 0.06 the output ignores the input and just follows the prompt, at 0.10&ndash;0.14 you get a blend of the two (this is where the interesting hybrids appear, such as a cat-human creature (or monster)), and from 0.25 up the input is mostly preserved with small stylistic changes.</p>
+
+<h3 id="a32" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">3.2 Text-conditioned edits</h3>
+
+<p class="my-3 leading-relaxed">Same procedure with an explicit text prompt on the same inputs, so the same photo can be steered somewhere specific.</p>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/text_edit_campanile.jpg" alt="Campanile: &ldquo;an obelisk in egypt with the sphinx in the background&rdquo;. The tower stays an upright obelisk while the sky and surroundings become a desert. By t<sub>start</sub> = 0.25 only hieroglyph-like marks hint at the prompt" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Campanile: &ldquo;an obelisk in egypt with the sphinx in the background&rdquo;. The tower stays an upright obelisk while the sky and surroundings become a desert. By t<sub>start</sub> = 0.25 only hieroglyph-like marks hint at the prompt</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/text_edit_my_image_1.jpg" alt="Skippy, &ldquo;the grand canyon&rdquo;" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Skippy, &ldquo;the grand canyon&rdquo;: at t<sub>start</sub> = 0.10 the cat gets a human face; by 0.25 it is a cat again with only a canyon-coloured wash</figcaption></figure>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/text_edit_my_image_2.jpg" alt="My own photo, &ldquo;pluto from mickey mouse&rdquo;: at 0.06&ndash;0.14 the glasses and nose become a cartoon character; at 0.25 and up the face is kept" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">My own photo, &ldquo;pluto from mickey mouse&rdquo;: at 0.06&ndash;0.14 the glasses and nose become a cartoon character; at 0.25 and up the face is kept</figcaption></figure>
+
+<h3 id="a33" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">3.3 Visual anagrams</h3>
+
+<p class="my-3 leading-relaxed">A visual anagram is an image that reads as one thing upright and another when rotated 180&deg;. At each step I compute the CFG velocity for prompt A on <i>x</i>, and for prompt B on the <i>flipped</i> image, rotate that velocity back, and average: <i>v = (v<sub>1</sub> + F(v<sub>2</sub>)) / 2</i>. The rotation must be undone before averaging, otherwise the two velocities live in different frames. Sampling starts from pure noise (t = 0).</p>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: visual anagrams</summary><pre><code>def visual_anagrams(noise, condition_a, condition_b, predict_velocity, w=7, step_size=0.02):
+    def velocity(x, t):
+        v1 = cfg_velocity(x, t, condition_a, w, predict_velocity)
+        v2 = rotate180(cfg_velocity(rotate180(x), t, condition_b, w, predict_velocity))
+        return (v1 + v2) / 2
+    x, _ = euler_sample(noise, 0, step_size, velocity)
+    return x</code></pre></details>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/anagram_views_0.jpg" alt="Anagram 1: upright (left) and rotated 180&deg; (right)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Anagram 1: upright (left) and rotated 180&deg; (right)</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/anagram_views_1.jpg" alt="Anagram 2: upright and rotated 180&deg;" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Anagram 2: upright and rotated 180&deg;</figcaption></figure>
+</div>
+
+<p class="my-3 leading-relaxed">In the first, the upright view is an old man whose chin and neck, flipped, become the group around the campfire. In the second, the upright view is a snowy village with the horse&rsquo;s head hidden among the roofs. The second is the more convincing one because the flip reuses the same strokes (the mountain&rsquo;s peaks become the horse&rsquo;s body).</p>
+
+<h3 id="a34" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">3.4 Hybrid images</h3>
+
+<p class="my-3 leading-relaxed">The same trick, with frequencies instead of rotations: take the low frequencies of one prompt&rsquo;s velocity (Gaussian low-pass, kernel 265, &sigma; = 16 at 512&times;512) and the high frequencies of another: <i>v = lowpass(v<sub>a</sub>) + v<sub>b</sub> &minus; lowpass(v<sub>b</sub>)</i>. Prompt A is what you see from far away and prompt B what you see up close. No flipping is involved here.</p>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: hybrid images</summary><pre><code>def make_hybrids(noise, condition_a, condition_b, predict_velocity, w=7, step_size=0.02):
+    def velocity(x, t):
+        v_a = cfg_velocity(x, t, condition_a, w, predict_velocity)
+        v_b = cfg_velocity(x, t, condition_b, w, predict_velocity)
+        return lowpass(v_a) + v_b - lowpass(v_b)
+    x, _ = euler_sample(noise, 0, step_size, velocity)
+    return x</code></pre></details>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/hybrid_0.jpg" alt="Hybrid 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">"A lithograph of a skull", "A lithograph of a waterfall"</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/hybrid_1.jpg" alt="Hybrid 2" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">"A lithograph of a cat", "A lithograph of a forest"</figcaption></figure>
+</div>
+
+<h2 id="partB" class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-16 pt-3 border-t-2 border-[var(--blue)]">Part B: Flow Matching from Scratch</h2>
+
+<p class="my-3 leading-relaxed">Part B trains everything from scratch on MNIST (images in [0, 1]) in PyTorch: first a single-step denoiser, then time-conditioned flow matching, then class-conditioned flow matching with classifier-free guidance.</p>
+
+<h3 id="b1" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1. Single-step denoising UNet</h3>
+
+<p class="my-3 leading-relaxed"><b>Architecture.</b> A UNet built from a few operators: <code class="i">Conv</code> (3&times;3, keeps resolution), <code class="i">DownConv</code> (stride 2 halves it), <code class="i">UpConv</code> (transposed conv doubles it), <code class="i">Flatten</code> (7&times;7 average pool to 1&times;1) and <code class="i">Unflatten</code>. The encoder uses D channels at 28&times;28 and 14&times;14, then 2D at 7&times;7 and a 1&times;1 bottleneck; the decoder mirrors it, concatenating the skip connections along the <i>channel</i> axis, so the first decoder block sees 4D channels (2D from the bottleneck path plus 2D from the skip) and the later ones see 2D. A final conv head maps back to one channel. Skip connections give the decoder the fine detail the bottleneck threw away.</p>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/UNet_architecture.png" alt="Noising process, &sigma; = 0 &hellip; 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Unconditional UNet Architecture</figcaption></figure>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: operators and UNet</summary><pre><code>class UpConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(out_channels), nn.GELU())
+    def forward(self, x): return self.net(x)
+
+# TimeConditionalUNet.forward (D channels, 28x28 input)
+t1 = self.fc1_t(t).view(-1, 2 * D, 1, 1)
+t2 = self.fc2_t(t).view(-1, D, 1, 1)
+x0 = self.conv_in(x)                      # D,   28x28
+x1 = self.down1(x0)                       # D,   14x14
+x2 = self.down2(x1)                       # 2D,   7x7
+u = self.unflatten(self.flatten(x2))      # 2D,   7x7  (from a 1x1 bottleneck)
+u = u * t1                                # time modulation
+u = self.up1(torch.cat([u, x2], dim=1))   # 4D -&gt; D, 14x14
+u = u * t2
+u = self.up2(torch.cat([u, x1], dim=1))   # 2D -&gt; D, 28x28
+u = self.conv_out(torch.cat([u, x0], dim=1))
+return self.head(u)</code></pre></details>
+
+<p class="my-3 leading-relaxed"><b>Noising.</b> The training pairs are made with <i>z = x + &sigma;&epsilon;</i>. Each row is one digit; left to right is &sigma; = 0.0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0. By &sigma; = 0.5 the digit is still recognisable to a person; at &sigma; = 1 it is barely so.</p>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_noising_process.png" alt="Noising process, &sigma; = 0 &hellip; 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Noising process, &sigma; = 0 &hellip; 1</figcaption></figure>
+
+<h3 id="b12" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.2 Training the denoiser at &sigma; = 0.5</h3>
+
+<p class="my-3 leading-relaxed">I train with an L2 loss on the clean target, batch size 256, Adam lr 1e-4, D = 128, 5 epochs, adding fresh noise to every batch. After one epoch the denoiser already removes most of the noise; after five epochs the digits are crisp and slightly smoothed (a few stroke endings, e.g. the &ldquo;5&rdquo; and &ldquo;4&rdquo; tails, are blurred).</p>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_denoiser_loss.png" alt="Training loss, &sigma; = 0.5" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Training loss, &sigma; = 0.5</figcaption></figure>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_denoiser_epoch1.png" alt="After epoch 1: clean / noisy / denoised" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">After epoch 1: clean / noisy / denoised</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_denoiser_epoch5.png" alt="After epoch 5: clean / noisy / denoised" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">After epoch 5: clean / noisy / denoised</figcaption></figure>
+</div>
+
+<h3 id="b13" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">Out-of-distribution noise levels</h3>
+
+<p class="my-3 leading-relaxed">The denoiser was trained only at &sigma; = 0.5. Testing it on other noise levels (rows alternate noisy / denoised, columns &sigma; = 0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0): it does fine for &sigma; &le; 0.6 and even cleans up lower noise levels, but at &sigma; = 0.8 and 1.0 it starts to hallucinate strokes, e.g. the &ldquo;1&rdquo; turns into a &ldquo;7&rdquo;. It never saw noise this strong, so it falls back on the kind of digit it expects.</p>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_ood.png" alt="Denoiser tested at other &sigma;" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Denoiser tested at other &sigma;</figcaption></figure>
+
+<h3 id="b14" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">1.2.3 Denoising pure noise</h3>
+
+<p class="my-3 leading-relaxed">Now I train the same model to map <i>pure noise</i> to a clean digit with an L2 loss. The output is the same blurry blob for every input, which is the <b>mean of the training digits</b>. With an L2 loss the optimal prediction for a given input is the average of all targets that could correspond to it, and since pure noise carries no information about which digit it was, that is the mean image of the training set. This is why one-step denoising cannot be used for generation, and it motivates iterating along a flow.</p>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_pn_epoch1.png" alt="Pure-noise denoiser, epoch 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Pure-noise denoiser, epoch 1</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_pn_epoch5.png" alt="Epoch 5: every output is the average digit" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 5: every output is the average digit</figcaption></figure>
+</div>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_pn_loss.png" alt="Training loss, pure-noise denoiser" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Training loss, pure-noise denoiser</figcaption></figure>
+
+<h3 id="b2" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">2. Time-conditioned flow matching</h3>
+
+<p class="my-3 leading-relaxed">A single step cannot go from noise to a digit, so I train a UNet to predict the <i>velocity</i> along the line from noise <i>x<sub>0</sub></i> to a clean image <i>x<sub>1</sub></i>: for <i>x<sub>t</sub> = (1 &minus; t)x<sub>0</sub> + t x<sub>1</sub></i> the target is <i>x<sub>1</sub> &minus; x<sub>0</sub></i>. The scalar t is injected through two FCBlocks whose outputs multiply the feature maps (after the unflatten and after the first up block). Training draws t uniformly from [0, 1] for each image; sampling runs T = 50 Euler steps. Settings: D = 64, batch 64, Adam lr 1e-2 with an exponential decay (gamma = 0.1<sup>1/10</sup> stepped each epoch), 10 epochs.</p>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: time-conditioned loss and sampler</summary><pre><code>def time_fm_forward(unet, x_1, num_ts):
+    N = x_1.shape[0]
+    x_0 = torch.randn_like(x_1)                                   # pure noise
+    t = torch.rand(N, device=x_1.device, dtype=x_1.dtype)         # one random time per image
+    t_ = t.view(N, 1, 1, 1)
+    x_t = (1 - t_) * x_0 + t_ * x_1
+    return F.mse_loss(unet(x_t, t), x_1 - x_0)
+
+@torch.inference_mode()
+def time_fm_sample(unet, img_wh, num_ts, seed=0, num_samples=40):
+    x = torch.randn(num_samples, unet.in_channels, *img_wh, generator=g)   # x_0 ~ N(0, I)
+    dt = 1.0 / num_ts
+    for i in range(num_ts):
+        t = torch.full((num_samples,), i / num_ts)
+        x = x + dt * unet(x, t)               # Euler step along the flow
+    return x</code></pre></details>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_time_loss.png" alt="Training loss, time-conditioned FM" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Training loss, time-conditioned FM</figcaption></figure>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_time_epoch1.png" alt="Epoch 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 1</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_time_epoch5.png" alt="Epoch 5" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 5</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_time_epoch10.png" alt="Epoch 10" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 10</figcaption></figure>
+</div>
+
+<p class="my-3 leading-relaxed">After one epoch the samples are squiggles with digit-like strokes; by epoch 5 most are recognisable; at epoch 10 many are clear digits, though some are still malformed, and nothing tells the model which digit to draw, so the classes are random.</p>
+
+<h3 id="b3" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">3. Class-conditioned flow matching with classifier-free guidance</h3>
+
+<p class="my-3 leading-relaxed">To control <i>which</i> digit comes out, the UNet also takes the class as a one-hot vector. Class and time each go through an FCBlock, and the features are modulated as <i>c &middot; features + t</i> at the same two places; with probability 10% the one-hot vector is zeroed so the same network learns the unconditional velocity too. At sampling time I use <i>u = u<sub>uncond</sub> + &gamma;(u<sub>cond</sub> &minus; u<sub>uncond</sub>)</i> with &gamma; = 5 and 300 Euler steps. Otherwise the same settings: D = 64, batch 64, Adam lr 1e-2 decaying exponentially to 1e-3 over 10 epochs. Each row of a sample grid is digits 0&ndash;9.</p>
+
+<details class="my-3"><summary class="font-mono text-sm text-[var(--rock)] font-medium">Code: class-conditioned loss (with conditioning dropout) and guided sampler</summary><pre><code>def class_fm_forward(unet, x_1, c, p_uncond, num_ts):
+    N = x_1.shape[0]
+    x_0 = torch.randn_like(x_1)
+    t = torch.rand(N, device=x_1.device, dtype=x_1.dtype)
+    t_ = t.view(N, 1, 1, 1)
+    x_t = (1 - t_) * x_0 + t_ * x_1
+    mask = (torch.rand(N, device=x_1.device) &gt;= p_uncond).to(x_1.dtype)   # 1 = keep class, 0 = drop it
+    return F.mse_loss(unet(x_t, c, t, mask), x_1 - x_0)
+
+# inside class_fm_sample, every step:
+u_uncond = unet(x, c, t, drop)      # drop = zeros: class masked out
+u_cond   = unet(x, c, t, keep)      # keep = ones
+u = u_uncond + guidance_scale * (u_cond - u_uncond)
+x = x + dt * u</code></pre></details>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_class_loss.png" alt="Training loss, class-conditioned FM (with scheduler)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Training loss, class-conditioned FM (with scheduler)</figcaption></figure>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_class_sched_epoch1.png" alt="Epoch 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 1</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_class_sched_epoch5.png" alt="Epoch 5" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 5</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_class_sched_epoch10.png" alt="Epoch 10" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 10</figcaption></figure>
+</div>
+
+<p class="my-3 leading-relaxed">Guidance gives the right digit in every column from epoch 1 on, but the early digits are noisy and deformed (the 4, 5, 8, 9 are the worst). By epoch 10 every row is clean and varied: the four samples per class differ in slant, thickness and style.</p>
+
+<h3 id="b32" class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-10 mb-1">Removing the learning-rate scheduler</h3>
+
+<p class="my-3 leading-relaxed">The scheduler multiplies the lr by 0.1<sup>1/10</sup> each epoch so it ends 10&times; lower. To remove it while keeping training stable, I use a <b>constant lr of 1e-3</b>, the value the scheduled run decays to by the end, instead of the starting 1e-2 (without any decay, such a high rate would likely keep the loss noisy), and change nothing else.</p>
+
+<figure class="my-5 viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_class_nosched_loss.png" alt="Training loss, no scheduler (constant lr 1e-3)" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Training loss, no scheduler (constant lr 1e-3)</figcaption></figure>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 my-5">
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_class_nosched_epoch1.png" alt="Epoch 1" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 1</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_class_nosched_epoch5.png" alt="Epoch 5" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 5</figcaption></figure>
+<figure class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span><img src="media/b_class_nosched_epoch10.png" alt="Epoch 10" loading="lazy" class="w-full h-auto"><figcaption class="section-tag mt-2 px-1">Epoch 10</figcaption></figure>
+</div>
+
+<p class="my-3 leading-relaxed">The constant-lr model reaches samples of similar quality, and the loss curve is flat after the first few hundred steps. The scheduled model&rsquo;s final samples are, to my eye, only marginally cleaner (slightly less speckle in the background), so for this small problem the scheduler is a polish rather than a necessity.</p>
+
+<h2 id="learned" class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-16 pt-3 border-t-2 border-[var(--blue)]">The most important thing I learned</h2>
+
+<p class="my-3 leading-relaxed">Generation as <i>integrating a velocity field</i>: one jump from noise gives an average (the blurry mean digit in Part B, the smooth cat in Part A), and many small steps along a learned flow give a sample. Guidance, editing, anagrams and hybrids are then all just different ways of combining or reshaping the velocity at each step.</p>
+
+</main>
+
+<footer class="border-t border-[var(--blue)]/15 mt-16">
+  <div class="max-w-5xl mx-auto px-6 py-8 flex flex-wrap justify-between items-center gap-3">
+    <a href="../index.html" class="section-tag hover:text-[var(--gold)] transition-colors">&larr; All&nbsp;Projects</a>
+  </div>
+</footer>
+
+</body></html>
