@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CS180 — Project 4A: Image Warping and Mosaicing</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue: #003262;
+    --blue-deep: #001c3d;
+    --gold: #FDB515;
+    --rock: #3B7EA1;
+    --paper: #F4F3EE;
+  }
+  html{ scroll-behavior: smooth; }
+  body{
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(rgba(0,50,98,0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,50,98,0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+    font-family: 'Inter', sans-serif;
+    color: var(--blue-deep);
+  }
+  .font-serif-display{ font-family: 'Source Serif 4', serif; }
+  .font-mono{ font-family: 'IBM Plex Mono', monospace; }
+  .section-tag{ font-family:'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--rock); }
+
+  .viewfinder{ position: relative; padding: 12px; }
+  .viewfinder::before, .viewfinder::after,
+  .viewfinder .vf-br, .viewfinder .vf-bl{
+    content:"";
+    position:absolute;
+    width: 18px; height: 18px;
+    border: 2.5px solid var(--gold);
+    z-index: 2;
+    pointer-events: none;
+  }
+  .viewfinder::before{ top:0; left:0; border-right:none; border-bottom:none; }
+  .viewfinder::after{ top:0; right:0; border-left:none; border-bottom:none; }
+  .viewfinder .vf-bl{ bottom:0; left:0; border-right:none; border-top:none; }
+  .viewfinder .vf-br{ bottom:0; right:0; border-left:none; border-top:none; }
+
+  @keyframes riseIn{ from{ opacity:0; transform: translateY(14px);} to{ opacity:1; transform: translateY(0);} }
+  .rise-in{ animation: riseIn 0.7s cubic-bezier(.22,.61,.36,1) both; }
+
+  .prose-p{ font-size: 15px; line-height: 1.7; color: rgba(0,28,61,.82); }
+  .prose-p + .prose-p{ margin-top: 1rem; }
+  .prose-p code, li code{ font-family:'IBM Plex Mono', monospace; font-size: 13px; background: rgba(0,50,98,.07); padding: 1px 5px; }
+  .eq{
+    font-family:'IBM Plex Mono', monospace; font-size: 13.5px; line-height: 1.9;
+    background: var(--blue); color: #e8eef5; padding: 18px 22px; overflow-x:auto; white-space: pre; margin-bottom:0;
+    border-left: 4px solid var(--gold);
+  }
+  .eq .g{ color: var(--gold); }
+  .eq .c{ color: #8fb7d0; }
+  .cap{ font-family:'IBM Plex Mono', monospace; font-size: 11.5px; color: rgba(0,28,61,.6); margin-top: 8px; }
+  .toggle{ display:inline-flex; border:1.5px solid var(--blue); }
+  .toggle button{
+    font-family:'IBM Plex Mono', monospace; font-size: 12px; padding: 6px 14px; color: var(--blue); background: transparent;
+    transition: background .15s, color .15s; cursor: pointer;
+  }
+  .toggle button[aria-pressed="true"]{ background: var(--blue); color: #fff; }
+  .toggle button:focus-visible{ outline: 2px solid var(--gold); outline-offset: 2px; }
+  .step-n{ font-family:'IBM Plex Mono', monospace; color: var(--gold); background: var(--blue); width: 26px; height: 26px; display:inline-flex; align-items:center; justify-content:center; font-size: 12.5px; flex: none; }
+  .img-link{ display:block; cursor: zoom-in; }
+  details > summary{ cursor:pointer; list-style: none; }
+  details > summary::-webkit-details-marker{ display:none; }
+  details[open] .chev{ transform: rotate(90deg); }
+  .chev{ display:inline-block; transition: transform .2s; color: var(--gold); }
+  .toc a{ font-family:'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--rock); border-bottom: 1px solid transparent; }
+  .toc a:hover{ color: var(--blue); border-bottom-color: var(--gold); }
+  @media (prefers-reduced-motion: reduce){ .rise-in{ animation: none; } html{ scroll-behavior:auto; } }
+</style>
+</head>
+<body class="antialiased">
+
+<header class="border-b border-[var(--blue)]/15">
+  <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="../" class="font-serif-display text-lg font-semibold text-[var(--blue)] hover:text-[var(--rock)] transition-colors">&larr; CS180</a>
+    <span class="section-tag hidden sm:inline">Intro to Computer Vision &amp; Computational Photography</span>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="max-w-5xl mx-auto px-6 pt-14 pb-10">
+  <p class="section-tag rise-in">Project 4 &middot; Part A</p>
+  <h1 class="font-serif-display text-4xl sm:text-6xl font-semibold text-[var(--blue)] mt-3 leading-[1.05] rise-in" style="animation-delay:.05s">
+    Image Warping<br class="hidden sm:block"> and Mosaicing
+  </h1>
+  <p class="mt-5 max-w-2xl text-[15px] leading-relaxed text-[var(--blue-deep)]/80 rise-in" style="animation-delay:.1s">
+    Recovering homographies from point correspondences, warping images by hand with two kinds of interpolation,
+    rectifying photos of rectangles, and stitching overlapping photos into seamless mosaics.
+  </p>
+
+  <div class="viewfinder overflow-hidden bg-black mt-10 rise-in" style="animation-delay:.15s">
+    <span class="vf-bl"></span><span class="vf-br"></span>
+    <img src="media/cover.jpg" alt="Three overlapping rooftop photos stitched into one wide skyline mosaic" class="w-full aspect-[3/2] sm:aspect-[2/1] object-cover">
+  </div>
+  <p class="cap">Mosaic 1 &mdash; three handheld photos of the same skyline, warped into one frame.</p>
+
+  <nav class="toc mt-8 flex flex-wrap gap-x-6 gap-y-2" aria-label="Sections">
+    <a href="#a1">A.1 Shoot</a>
+    <a href="#a2">A.2 Homographies</a>
+    <a href="#a3">A.3 Warp &amp; rectify</a>
+    <a href="#a4">A.4 Mosaics</a>
+    <a href="#reflect">Takeaways</a>
+  </nav>
+</section>
+
+<!-- A.1 -->
+<section id="a1" class="max-w-5xl mx-auto px-6 py-12 border-t border-[var(--blue)]/15">
+  <p class="section-tag">A.1</p>
+  <h2 class="font-serif-display text-3xl font-semibold text-[var(--blue)] mt-2">Shoot the pictures</h2>
+  <div class="mt-4 max-w-2xl">
+    <p class="prose-p">A projective mosaic only works if the transform between photos really is a homography, so the key is to fix the
+      camera's center of projection and <em>rotate</em> it, rather than walking sideways. I stood still and pivoted for each set, used the
+      normal 1&times; lens (no ultra-wide distortion), and aimed for roughly 50&ndash;60% overlap between neighbours. I shot three
+      mosaic sets and used a monitor and a window as the known rectangles.</p>
+  </div>
+
+  <div class="mt-10 space-y-10">
+    <div>
+      <p class="font-mono text-xs text-[var(--rock)] mb-3">Set 1 &middot; Rooftop skyline</p>
+      <div class="grid grid-cols-3 gap-3">
+        <a class="img-link" href="media/src_IMG_1131.jpg"><img src="media/src_IMG_1131.jpg" alt="Skyline photo, left" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy"></a>
+        <a class="img-link" href="media/src_IMG_1132.jpg"><img src="media/src_IMG_1132.jpg" alt="Skyline photo, middle (reference)" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy"></a>
+        <a class="img-link" href="media/src_IMG_1133.jpg"><img src="media/src_IMG_1133.jpg" alt="Skyline photo, right" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy"></a>
+      </div>
+    </div>
+    <div>
+      <p class="font-mono text-xs text-[var(--rock)] mb-3">Set 2 &middot; Brick wall</p>
+      <div class="grid grid-cols-3 gap-3">
+        <a class="img-link" href="media/src_IMG_1134.jpg"><img src="media/src_IMG_1134.jpg" alt="Brick wall photo, left" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy"></a>
+        <a class="img-link" href="media/src_IMG_1135.jpg"><img src="media/src_IMG_1135.jpg" alt="Brick wall photo, middle (reference)" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy"></a>
+        <a class="img-link" href="media/src_IMG_1136.jpg"><img src="media/src_IMG_1136.jpg" alt="Brick wall photo, right" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy"></a>
+      </div>
+    </div>
+    <div>
+      <p class="font-mono text-xs text-[var(--rock)] mb-3">Set 3 &middot; Closet</p>
+      <div class="grid grid-cols-3 gap-3">
+        <a class="img-link" href="media/src_IMG_1139.jpg"><img src="media/src_IMG_1139.jpg" alt="Closet photo, left (reference)" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy"></a>
+        <a class="img-link" href="media/src_IMG_1140.jpg"><img src="media/src_IMG_1140.jpg" alt="Closet photo, right" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy"></a>
+        <div class="border border-dashed border-[var(--blue)]/25 flex items-center justify-center text-[var(--blue-deep)]/40 aspect-[3/4]"><p class="font-mono text-xs px-2 text-center">two photos in this set</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- A.2 -->
+<section id="a2" class="max-w-5xl mx-auto px-6 py-12 border-t border-[var(--blue)]/15">
+  <p class="section-tag">A.2</p>
+  <h2 class="font-serif-display text-3xl font-semibold text-[var(--blue)] mt-2">Recover homographies</h2>
+  <div class="mt-4 max-w-2xl">
+    <p class="prose-p">A homography <code>H</code> maps a point <code>(x, y)</code> in one image to <code>(x', y')</code> in another, up to a
+      scale. Fixing the bottom-right entry to 1 leaves eight unknowns. Writing out
+      <code>x' = (h1&middot;x + h2&middot;y + h3) / (h7&middot;x + h8&middot;y + 1)</code> and multiplying through by the denominator makes each
+      equation <em>linear</em> in <code>h</code>, so every correspondence contributes two rows:</p>
+  </div>
+
+  <pre class="eq mt-6"><span class="c">// one correspondence (x,y) &rarr; (x',y')   &nbsp;  unknowns h = [h1 &hellip; h8]&#7488;</span>
+[ x  y  1  0  0  0  <span class="g">-x&middot;x'  -y&middot;x'</span> ] &middot; h = x'
+[ 0  0  0  x  y  1  <span class="g">-x&middot;y'  -y&middot;y'</span> ] &middot; h = y'
+
+<span class="c">// n points stack into A (2n &times; 8) and b (2n), solved in least squares</span>
+h = argmin &#8214; A h &minus; b &#8214;&sup2; &nbsp;&rarr;&nbsp; np.linalg.lstsq(A, b)</pre>
+
+  <div class="mt-6 max-w-2xl">
+    <p class="prose-p">With more than four points the system is overdetermined, which averages out click noise. Before solving I
+      <strong>normalize</strong> the points (translate them to their centroid and scale to a mean distance of &radic;2), then fold the
+      normalization back into <code>H</code>. Raw pixel coordinates span hundreds of units while the last column of <code>A</code> is 1, so
+      without this the system is badly conditioned.</p>
+    <p class="prose-p">Sanity checks: a synthetic homography is recovered to within <code>5e-13</code>, and with 0.5&nbsp;px of noise added to
+      12 points the mean reprojection error is 0.4&nbsp;px. For example, the monitor rectification below solves to</p>
+  </div>
+  <pre class="eq mt-4">H<sub>monitor</sub> =
+[  <span class="g"> 0.99489</span>   0.02356  -187.506 ]
+[ -0.14220   0.98224   -34.308 ]
+[ -0.00033  -0.00001     1.000 ]</pre>
+</section>
+
+<!-- A.3 -->
+<section id="a3" class="max-w-5xl mx-auto px-6 py-12 border-t border-[var(--blue)]/15">
+  <p class="section-tag">A.3</p>
+  <h2 class="font-serif-display text-3xl font-semibold text-[var(--blue)] mt-2">Warp the images</h2>
+  <div class="mt-4 max-w-2xl">
+    <p class="prose-p">Both warps use <strong>inverse warping</strong>, which leaves no holes: I push the four image corners through <code>H</code>
+      to size the output canvas, then for every <em>output</em> pixel apply <code>H&#8315;&sup1;</code>, divide by the homogeneous
+      coordinate, and read the source image at that location. Anything that lands outside the source gets alpha&nbsp;0, which the mosaic
+      blend needs later. Everything is vectorized with NumPy; no library warp or interpolation routine is used.</p>
+    <ul class="mt-4 space-y-3 text-[15px] leading-relaxed text-[var(--blue-deep)]/82">
+      <li class="flex gap-3"><span class="step-n">NN</span><span><code>warpImageNearestNeighbor</code> rounds the source coordinate to the closest pixel. Fast, but diagonal edges turn into stair-steps.</span></li>
+      <li class="flex gap-3"><span class="step-n">BL</span><span><code>warpImageBilinear</code> takes the weighted average of the four surrounding pixels, weighted by the fractional offsets. Smooth edges, very slightly softer. It matches <code>cv2.warpPerspective</code> to ~7e-7 in a test.</span></li>
+    </ul>
+  </div>
+
+  <h3 class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-12">Rectification</h3>
+  <div class="mt-3 max-w-2xl">
+    <p class="prose-p">To test the code on its own, I took photos of known rectangles and mapped their four corners to a true rectangle.
+      The monitor's bezel goes to a 1392&times;800 rectangle. For the white-framed window I picked the aspect ratio at which its
+      panes come out square.</p>
+  </div>
+
+  <div class="mt-4 flex items-center gap-3 flex-wrap">
+    <span class="font-mono text-xs text-[var(--rock)]">Interpolation</span>
+    <div class="toggle" role="group" aria-label="Interpolation method" id="interp">
+      <button type="button" data-v="nn" aria-pressed="false">nearest</button>
+      <button type="button" data-v="bilinear" aria-pressed="true">bilinear</button>
+    </div>
+  </div>
+
+  <div class="grid sm:grid-cols-2 gap-8 mt-6">
+    <div>
+      <div class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span>
+        <a class="img-link" href="media/rect_monitor_source.jpg"><img src="media/rect_monitor_source.jpg" alt="Monitor photographed at an angle, corners outlined in gold" class="w-full aspect-[4/3] object-cover" loading="lazy"></a></div>
+      <p class="cap">Monitor &middot; original, clicked corners in gold</p>
+    </div>
+    <div>
+      <div class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span>
+        <a class="img-link" href="media/rect_monitor_bilinear.jpg" data-rect="monitor"><img src="media/rect_monitor_bilinear.jpg" data-rect="monitor" alt="Rectified monitor, now a true rectangle" class="w-full aspect-[4/3] object-contain" loading="lazy"></a></div>
+      <p class="cap">Monitor &middot; rectified (<span data-interp-label>bilinear</span>)</p>
+    </div>
+    <div>
+      <div class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span>
+        <a class="img-link" href="media/rect_window_source.jpg"><img src="media/rect_window_source.jpg" alt="White-framed window seen from an angle, corners outlined in gold" class="w-full aspect-[4/3] object-cover" loading="lazy"></a></div>
+      <p class="cap">Window &middot; original, clicked corners in gold</p>
+    </div>
+    <div>
+      <div class="viewfinder overflow-hidden bg-black"><span class="vf-bl"></span><span class="vf-br"></span>
+        <a class="img-link" href="media/rect_window_bilinear.jpg" data-rect="window"><img src="media/rect_window_bilinear.jpg" data-rect="window" alt="Rectified window with square panes" class="w-full aspect-[4/3] object-contain" loading="lazy"></a></div>
+      <p class="cap">Window &middot; rectified (<span data-interp-label>bilinear</span>)</p>
+    </div>
+  </div>
+
+  <h3 class="font-serif-display text-xl font-semibold text-[var(--blue)] mt-12">Nearest neighbor vs. bilinear, up close</h3>
+  <div class="mt-3 max-w-2xl">
+    <p class="prose-p">Zoomed 4&times; on the same patch: nearest neighbor (left) leaves a visibly jagged, stair-stepped edge on the
+      window's slanted muntin, while bilinear (right) is smooth.</p>
+  </div>
+  <div class="viewfinder overflow-hidden bg-black mt-5"><span class="vf-bl"></span><span class="vf-br"></span>
+    <a class="img-link" href="media/rect_window_compare_zoom.jpg"><img src="media/rect_window_compare_zoom.jpg" alt="Side-by-side zoom: nearest neighbor on the left, bilinear on the right" class="w-full" loading="lazy"></a></div>
+  <div class="viewfinder overflow-hidden bg-black mt-6"><span class="vf-bl"></span><span class="vf-br"></span>
+    <a class="img-link" href="media/rect_monitor_compare_zoom.jpg"><img src="media/rect_monitor_compare_zoom.jpg" alt="Side-by-side zoom on the monitor rectification" class="w-full" loading="lazy"></a></div>
+  <p class="cap">4&times; crops &middot; left nearest, right bilinear</p>
+</section>
+
+<!-- A.4 -->
+<section id="a4" class="max-w-5xl mx-auto px-6 py-12 border-t border-[var(--blue)]/15">
+  <p class="section-tag">A.4</p>
+  <h2 class="font-serif-display text-3xl font-semibold text-[var(--blue)] mt-2">Blend into a mosaic</h2>
+  <div class="mt-4 max-w-2xl">
+    <p class="prose-p">Each mosaic picks one image (the middle one, or the first for the two-photo set) as the reference and warps the
+      others into its frame. Pasting them directly leaves hard seams, so the layers are blended:</p>
+  </div>
+
+  <ol class="mt-5 max-w-2xl space-y-4 text-[15px] leading-relaxed text-[var(--blue-deep)]/82">
+    <li class="flex gap-3"><span class="step-n">1</span><span><strong>Correspondences.</strong> Candidate matches come from SIFT with a ratio test, are cleaned with a RANSAC loop built on my own <code>computeH</code>, then thinned to 16 well-spread points per image pair. The final <code>H</code> is solved with <code>computeH</code> from those points (mean reprojection error 1.0&ndash;1.6&nbsp;px).</span></li>
+    <li class="flex gap-3"><span class="step-n">2</span><span><strong>Canvas.</strong> The corners of every image are pushed through its homography to size one shared canvas.</span></li>
+    <li class="flex gap-3"><span class="step-n">3</span><span><strong>Weights.</strong> Each image carries a feather weight, 1 at its center falling to 0 at its border, warped along with it. A per-layer gain matches brightness in the overlap.</span></li>
+    <li class="flex gap-3"><span class="step-n">4</span><span><strong>Blend.</strong> Either a plain <em>weighted average</em>, or a <em>2-band Laplacian blend</em>: the low-frequency band mixes smoothly (soft exposure transition) while the high-frequency band comes from whichever image has the larger weight, so edges don't double up where alignment is imperfect.</span></li>
+  </ol>
+
+  <div class="mt-8 flex items-center gap-3 flex-wrap">
+    <span class="font-mono text-xs text-[var(--rock)]">Blend</span>
+    <div class="toggle" role="group" aria-label="Blend method" id="blend">
+      <button type="button" data-v="weighted" aria-pressed="false">weighted average</button>
+      <button type="button" data-v="laplacian" aria-pressed="true">Laplacian</button>
+    </div>
+  </div>
+
+  <!-- Mosaic 1 -->
+  <div class="mt-10">
+    <p class="font-mono text-xs text-[var(--rock)]">Mosaic 1</p>
+    <h3 class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-1">Rooftop skyline</h3>
+    <div class="grid grid-cols-3 gap-3 mt-4">
+      <img src="media/src_IMG_1131.jpg" alt="Source 1" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy">
+      <img src="media/src_IMG_1132.jpg" alt="Source 2 (reference)" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy">
+      <img src="media/src_IMG_1133.jpg" alt="Source 3" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy">
+    </div>
+    <div class="viewfinder overflow-hidden bg-black mt-4"><span class="vf-bl"></span><span class="vf-br"></span>
+      <a class="img-link" href="media/A_skyline_laplacian.jpg" data-mosaic="A_skyline"><img src="media/A_skyline_laplacian.jpg" data-mosaic="A_skyline" alt="Skyline mosaic" class="w-full" loading="lazy"></a></div>
+    <p class="cap">Result &middot; <span data-blend-label>Laplacian</span> blend. The clouds and sunset gradient cross both seams with no visible edge.</p>
+  </div>
+
+  <!-- Mosaic 2 -->
+  <div class="mt-16">
+    <p class="font-mono text-xs text-[var(--rock)]">Mosaic 2</p>
+    <h3 class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-1">Brick wall</h3>
+    <div class="grid grid-cols-3 gap-3 mt-4">
+      <img src="media/src_IMG_1134.jpg" alt="Source 1" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy">
+      <img src="media/src_IMG_1135.jpg" alt="Source 2 (reference)" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy">
+      <img src="media/src_IMG_1136.jpg" alt="Source 3" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy">
+    </div>
+    <div class="viewfinder overflow-hidden bg-black mt-4"><span class="vf-bl"></span><span class="vf-br"></span>
+      <a class="img-link" href="media/B_wall_laplacian.jpg" data-mosaic="B_wall"><img src="media/B_wall_laplacian.jpg" data-mosaic="B_wall" alt="Brick wall mosaic" class="w-full" loading="lazy"></a></div>
+    <p class="cap">Result &middot; <span data-blend-label>Laplacian</span> blend. Windows, drainpipes, and the wire line up across both seams.</p>
+  </div>
+
+  <!-- Mosaic 3 -->
+  <div class="mt-16">
+    <p class="font-mono text-xs text-[var(--rock)]">Mosaic 3</p>
+    <h3 class="font-serif-display text-2xl font-semibold text-[var(--blue)] mt-1">Closet</h3>
+    <div class="grid grid-cols-2 gap-3 mt-4 max-w-md">
+      <img src="media/src_IMG_1139.jpg" alt="Source 1 (reference)" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy">
+      <img src="media/src_IMG_1140.jpg" alt="Source 2" class="w-full aspect-[3/4] object-cover bg-black" loading="lazy">
+    </div>
+    <div class="viewfinder overflow-hidden bg-black mt-4 max-w-2xl"><span class="vf-bl"></span><span class="vf-br"></span>
+      <a class="img-link" href="media/C_closet_laplacian.jpg" data-mosaic="C_closet"><img src="media/C_closet_laplacian.jpg" data-mosaic="C_closet" alt="Closet mosaic" class="w-full" loading="lazy"></a></div>
+    <p class="cap">Result &middot; <span data-blend-label>Laplacian</span> blend. Flip the toggle to see the difference.</p>
+    <div class="mt-4 max-w-2xl">
+      <p class="prose-p">This is the hard case. The open doors and the hanging clothes sit at different depths from the closet frame, and the
+        camera shifts a little between shots, so no single homography fits everything. The weighted average doubles the left door and
+        the clothes; the Laplacian blend keeps the frame aligned and takes edges from one image only, which mostly hides the ghosting.
+        The photographs would need a pure rotation, or a flatter scene, to eliminate it.</p>
+    </div>
+  </div>
+
+  <!-- correspondences -->
+  <details class="mt-14 border border-[var(--blue)]/20 bg-white/50">
+    <summary class="px-5 py-4 flex items-center gap-3 font-mono text-[13px] text-[var(--blue)]"><span class="chev">&rsaquo;</span> Correspondences used for each warp</summary>
+    <div class="px-5 pb-6 space-y-6">
+      <p class="prose-p max-w-2xl">16 matched points per image pair, drawn on the source (left) and reference (right).</p>
+      <div><img src="media/A_skyline_corr_IMG_1131.jpg" alt="Skyline correspondences, image 1 to reference" class="w-full" loading="lazy"><p class="cap">Skyline &middot; image 1 &rarr; reference</p></div>
+      <div><img src="media/A_skyline_corr_IMG_1133.jpg" alt="Skyline correspondences, image 3 to reference" class="w-full" loading="lazy"><p class="cap">Skyline &middot; image 3 &rarr; reference</p></div>
+      <div><img src="media/B_wall_corr_IMG_1134.jpg" alt="Wall correspondences, image 1 to reference" class="w-full" loading="lazy"><p class="cap">Brick wall &middot; image 1 &rarr; reference</p></div>
+      <div><img src="media/B_wall_corr_IMG_1136.jpg" alt="Wall correspondences, image 3 to reference" class="w-full" loading="lazy"><p class="cap">Brick wall &middot; image 3 &rarr; reference</p></div>
+      <div><img src="media/C_closet_corr_IMG_1140.jpg" alt="Closet correspondences" class="w-full" loading="lazy"><p class="cap">Closet &middot; image 2 &rarr; reference</p></div>
+    </div>
+  </details>
+</section>
+
+<!-- Takeaways -->
+<section id="reflect" class="max-w-5xl mx-auto px-6 py-12 border-t border-[var(--blue)]/15">
+  <p class="section-tag">Takeaways</p>
+  <h2 class="font-serif-display text-3xl font-semibold text-[var(--blue)] mt-2">What I learned</h2>
+  <div class="mt-4 max-w-2xl">
+    <p class="prose-p">Point selection matters more than the solver. Points on one plane reproject to about a pixel; points on things at a
+      different depth (the chimney, the wire, the open closet doors) can't all fit one homography, and no amount of least squares fixes that.
+      Normalizing coordinates before the solve is nearly free and keeps the system well conditioned. And bilinear sampling removes the
+      stair-stepping that nearest neighbor leaves behind in a rectified image.</p>
+    <p class="prose-p">Part B will move from hand-picked correspondences to automatic feature matching.</p>
+  </div>
+</section>
+
+<footer class="max-w-5xl mx-auto px-6 py-10 border-t border-[var(--blue)]/15 flex flex-wrap items-center justify-between gap-3">
+  <p class="text-xs text-[var(--blue-deep)]/60">CS180 — Intro to Computer Vision and Computational Photography · UC Berkeley</p>
+  <a href="../" class="font-mono text-xs text-[var(--rock)] hover:text-[var(--blue)]">&larr; Back to gallery</a>
+</footer>
+
+<script>
+(function(){
+  var interp = 'bilinear', blend = 'laplacian';
+  function setPressed(group, v){
+    group.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
+  }
+  function applyInterp(){
+    document.querySelectorAll('[data-rect]').forEach(function(el){
+      var src = 'media/rect_' + el.dataset.rect + '_' + interp + '.jpg';
+      if (el.tagName === 'IMG') el.src = src; else el.href = src;
+    });
+    document.querySelectorAll('[data-interp-label]').forEach(function(s){ s.textContent = interp === 'nn' ? 'nearest neighbor' : 'bilinear'; });
+    setPressed(document.getElementById('interp'), interp);
+  }
+  function applyBlend(){
+    document.querySelectorAll('[data-mosaic]').forEach(function(el){
+      var src = 'media/' + el.dataset.mosaic + '_' + blend + '.jpg';
+      if (el.tagName === 'IMG') el.src = src; else el.href = src;
+    });
+    document.querySelectorAll('[data-blend-label]').forEach(function(s){ s.textContent = blend === 'weighted' ? 'weighted-average' : 'Laplacian'; });
+    setPressed(document.getElementById('blend'), blend);
+  }
+  document.getElementById('interp').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return; interp = b.dataset.v; applyInterp();
+  });
+  document.getElementById('blend').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return; blend = b.dataset.v; applyBlend();
+  });
+})();
+</script>
+</body>
+</html>
